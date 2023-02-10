@@ -8,7 +8,7 @@
 FireFly is an advanced black-box fuzzer and not just a standard asset discovery tool. FireFly gives the advantage of testing a target with a large amount of built in checks to detect behaviors in the target.
 
 **Note:**
->  FireFly is in a very new state (v1.0) but works okay for now, if the target do not contain too much dynamic content. FireFly still detects and filters dynamic changes, but not yet perfectly.
+>  Firefly is in a very new stage (v1.0) but works well for now, if the target does not contain too much dynamic content. Firefly still detects and filters dynamic changes, but not yet perfectly.
 
 # Advantages
 - Hevy use of gorutines and internal hardware for great preformance
