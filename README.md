@@ -1,4 +1,9 @@
 
+<h1 align="center">
+  <img src="fireflyLogo.png" alt="firefly" width="200px">
+  <br>
+</h1>
+
 # Description
 FireFly is an advanced black-box fuzzer and not just a standard asset discovery tool. FireFly gives the advantage of testing a target with a large amount of built in checks to detect behaviors in the target.
 
