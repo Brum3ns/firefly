@@ -1,6 +1,6 @@
 
 <h1 align="center">
-  <img src="fireflyLogo.png" alt="firefly" width="200px">
+  <img src="fireflyLogo.png" alt="firefly" width="220px">
   <br>
 </h1>
 
