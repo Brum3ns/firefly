@@ -27,7 +27,7 @@ FireFly is an advanced black-box fuzzer and not just a standard asset discovery 
 # Installation
 
 ```
-go install -v github.com/Brum3ns/firefly/firefly@latest
+go install -v github.com/Brum3ns/firefly/cmd/firefly@latest
 ```
 
 If the above install method do not work try the following:
