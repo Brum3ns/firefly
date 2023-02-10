@@ -1,0 +1,19 @@
+cloudflare
+cloudfront
+oracle web cache
+wordpress super cache
+varnish
+akamai
+wp rocket
+wprocket
+wp total cache
+rackcache
+wpcache
+redis object cache
+litespeed
+wpcacheon
+endurance
+google pagespeed
+fastly
+gocache
+azure

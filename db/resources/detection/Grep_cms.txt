@@ -1,0 +1,20 @@
+shopify
+shopware
+stripe
+prestashop
+woocommerce
+bugcommerce
+opencart
+magento
+joomla
+microsoft sharepoint
+duda
+1c-bitrix
+squarespace
+tilda
+pligg
+lithium
+webedition
+impresspages
+jalios
+cmssimple

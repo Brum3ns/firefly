@@ -1,0 +1,20 @@
+getQuery =
+QueryString = 
+urlParams =
+urlParam =
+getQuery=
+QueryString= 
+urlParams=
+urlParam=
+URLSearchParams(
+location.pathname
+location.search
+innerHTML(location.href
+innerHTML(location.pathname
+innerHTML(location.search
+.split('&')
+.split("&")
+.split("&")[
+.split('&')[
+.split('?')[
+.split("?")[

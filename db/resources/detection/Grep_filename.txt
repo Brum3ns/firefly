@@ -1,0 +1,17 @@
+admin.php
+administrator.php
+admin.asp
+backup.sql
+.sql
+database.php
+phpmyadmin.php
+administrator.asp
+.DB_STORE
+private.php
+upload.php
+file.php
+files.php
+admin.asp
+administrator.asp
+admin.rb
+administrator.rb

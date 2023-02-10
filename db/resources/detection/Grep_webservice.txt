@@ -1,0 +1,50 @@
+php
+ruby
+java
+python
+golang
+javascript
+iiS
+windows
+Microsoft
+apache
+nginx
+envoy
+bigip
+ibm datapower
+matori
+ini_set
+litespeed
+openresty
+express
+next
+nuxt
+node
+httpapi
+cowboy
+tomcat
+caddy
+kestrel
+jetty
+flask
+tornadoserver
+uvicorn
+twistedweb
+aolserver
+thttpd
+cherrypy
+glassfish
+couchdb
+tengine
+mongrel
+hp compact
+daphne
+xitami
+libwww-perl
+jboss application
+amazon ec2
+phusion
+cherokee
+goahead
+starlet
+openbsd
