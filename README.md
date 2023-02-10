@@ -18,6 +18,11 @@ FireFly is an advanced black-box fuzzer and not just a standard asset discovery 
 - Friendly error and debug output
 - Build in payload (default list are taken from [seclists](https://github.com/danielmiessler/SecLists)) tampering and encoding functionality
 
+# Features
+<h1 align="center">
+  <img src="fireflyOptions.png" alt="fireflyOptions" width="100%">
+  <br>
+</h1>
 
 # Installation
 
