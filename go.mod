@@ -1,4 +1,4 @@
-module github.com/Brum3ns/FireFly
+module github.com/Brum3ns/firefly
 
 go 1.18
 
