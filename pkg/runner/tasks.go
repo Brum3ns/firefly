@@ -3,10 +3,10 @@ package runner
 import (
 	"sync"
 
-	"github.com/Brum3ns/FireFly/pkg/firefly/technique"
-	"github.com/Brum3ns/FireFly/pkg/functions"
-	G "github.com/Brum3ns/FireFly/pkg/functions/globalVariables"
-	"github.com/Brum3ns/FireFly/pkg/storage"
+	"github.com/Brum3ns/firefly/pkg/firefly/technique"
+	"github.com/Brum3ns/firefly/pkg/functions"
+	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
+	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 /* func (r *Runner) Calcs(ID int, resp storage.Response) *EiCalc {

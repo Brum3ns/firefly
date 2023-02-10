@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"strconv"
 
-	fc "github.com/Brum3ns/FireFly/pkg/functions"
-	"github.com/Brum3ns/FireFly/pkg/storage"
+	fc "github.com/Brum3ns/firefly/pkg/functions"
+	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 /*

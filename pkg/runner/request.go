@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Brum3ns/FireFly/pkg/functions"
-	fc "github.com/Brum3ns/FireFly/pkg/functions"
-	"github.com/Brum3ns/FireFly/pkg/parse"
-	"github.com/Brum3ns/FireFly/pkg/storage"
-	st "github.com/Brum3ns/FireFly/pkg/storage"
+	"github.com/Brum3ns/firefly/pkg/functions"
+	fc "github.com/Brum3ns/firefly/pkg/functions"
+	"github.com/Brum3ns/firefly/pkg/parse"
+	"github.com/Brum3ns/firefly/pkg/storage"
+	st "github.com/Brum3ns/firefly/pkg/storage"
 )
 
 type client_struct struct {

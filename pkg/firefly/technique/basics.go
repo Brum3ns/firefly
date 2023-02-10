@@ -3,7 +3,7 @@ package technique
 import (
 	"net/http"
 
-	G "github.com/Brum3ns/FireFly/pkg/functions/globalVariables"
+	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
 )
 
 func General(body []byte, headers http.Header) (bool, []string) {

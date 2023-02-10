@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	st "github.com/Brum3ns/FireFly/pkg/storage"
+	st "github.com/Brum3ns/firefly/pkg/storage"
 )
 
 /*

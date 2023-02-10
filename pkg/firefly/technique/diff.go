@@ -3,10 +3,10 @@ package technique
 import (
 	"fmt"
 
-	"github.com/Brum3ns/FireFly/pkg/firefly/prepare"
-	"github.com/Brum3ns/FireFly/pkg/firefly/types"
-	fc "github.com/Brum3ns/FireFly/pkg/functions"
-	"github.com/Brum3ns/FireFly/pkg/storage"
+	"github.com/Brum3ns/firefly/pkg/firefly/prepare"
+	"github.com/Brum3ns/firefly/pkg/firefly/types"
+	fc "github.com/Brum3ns/firefly/pkg/functions"
+	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 type diffData struct {

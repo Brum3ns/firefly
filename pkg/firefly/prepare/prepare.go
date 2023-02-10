@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Brum3ns/FireFly/pkg/firefly/types"
-	"github.com/Brum3ns/FireFly/pkg/functions"
-	fc "github.com/Brum3ns/FireFly/pkg/functions"
+	"github.com/Brum3ns/firefly/pkg/firefly/types"
+	"github.com/Brum3ns/firefly/pkg/functions"
+	fc "github.com/Brum3ns/firefly/pkg/functions"
 	"golang.org/x/net/html"
 )
 

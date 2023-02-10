@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Brum3ns/FireFly/pkg/design"
-	fc "github.com/Brum3ns/FireFly/pkg/functions"
-	"github.com/Brum3ns/FireFly/pkg/storage"
+	"github.com/Brum3ns/firefly/pkg/design"
+	fc "github.com/Brum3ns/firefly/pkg/functions"
+	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 type Edata struct {

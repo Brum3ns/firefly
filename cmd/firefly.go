@@ -6,11 +6,11 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/Brum3ns/FireFly/pkg/design"
-	fc "github.com/Brum3ns/FireFly/pkg/functions"
-	"github.com/Brum3ns/FireFly/pkg/parse"
-	"github.com/Brum3ns/FireFly/pkg/runner"
-	"github.com/Brum3ns/FireFly/pkg/storage"
+	"github.com/Brum3ns/firefly/pkg/design"
+	fc "github.com/Brum3ns/firefly/pkg/functions"
+	"github.com/Brum3ns/firefly/pkg/parse"
+	"github.com/Brum3ns/firefly/pkg/runner"
+	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 func main() {

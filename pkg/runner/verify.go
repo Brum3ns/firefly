@@ -5,11 +5,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Brum3ns/FireFly/pkg/firefly/prepare"
-	"github.com/Brum3ns/FireFly/pkg/functions"
-	fc "github.com/Brum3ns/FireFly/pkg/functions"
-	G "github.com/Brum3ns/FireFly/pkg/functions/globalVariables"
-	"github.com/Brum3ns/FireFly/pkg/storage"
+	"github.com/Brum3ns/firefly/pkg/firefly/prepare"
+	"github.com/Brum3ns/firefly/pkg/functions"
+	fc "github.com/Brum3ns/firefly/pkg/functions"
+	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
+	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 type verifyResult struct {

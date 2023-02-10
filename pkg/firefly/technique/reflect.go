@@ -3,9 +3,9 @@ package technique
 import (
 	"strings"
 
-	"github.com/Brum3ns/FireFly/pkg/design"
-	"github.com/Brum3ns/FireFly/pkg/functions"
-	"github.com/Brum3ns/FireFly/pkg/storage"
+	"github.com/Brum3ns/firefly/pkg/design"
+	"github.com/Brum3ns/firefly/pkg/functions"
+	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 //[TODO] Fix XSS detection better (print if an XSS as a high chance to work)

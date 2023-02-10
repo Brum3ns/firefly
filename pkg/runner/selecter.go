@@ -1,7 +1,7 @@
 package runner
 
 import (
-	G "github.com/Brum3ns/FireFly/pkg/functions/globalVariables"
+	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
 )
 
 func (r *Runner) SelectTotal(v bool) (int, error) {

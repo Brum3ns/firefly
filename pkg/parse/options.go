@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Brum3ns/FireFly/pkg/design"
-	fc "github.com/Brum3ns/FireFly/pkg/functions"
-	G "github.com/Brum3ns/FireFly/pkg/functions/globalVariables"
+	"github.com/Brum3ns/firefly/pkg/design"
+	fc "github.com/Brum3ns/firefly/pkg/functions"
+	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
 	"github.com/projectdiscovery/goflags"
 )
 

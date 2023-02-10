@@ -1,10 +1,10 @@
 package runner
 
 import (
-	"github.com/Brum3ns/FireFly/pkg/design"
-	"github.com/Brum3ns/FireFly/pkg/functions"
-	G "github.com/Brum3ns/FireFly/pkg/functions/globalVariables"
-	"github.com/Brum3ns/FireFly/pkg/storage"
+	"github.com/Brum3ns/firefly/pkg/design"
+	"github.com/Brum3ns/firefly/pkg/functions"
+	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
+	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 /** Define jobs to a channel. It also insert the payload to all sources ( Adjusted for the fuzz/verify process )*/

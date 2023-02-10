@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	G "github.com/Brum3ns/FireFly/pkg/functions/globalVariables"
+	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
 )
 
 /*

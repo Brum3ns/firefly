@@ -4,12 +4,12 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/Brum3ns/FireFly/pkg/design"
-	fc "github.com/Brum3ns/FireFly/pkg/functions"
-	G "github.com/Brum3ns/FireFly/pkg/functions/globalVariables"
-	"github.com/Brum3ns/FireFly/pkg/output"
-	"github.com/Brum3ns/FireFly/pkg/parse"
-	"github.com/Brum3ns/FireFly/pkg/storage"
+	"github.com/Brum3ns/firefly/pkg/design"
+	fc "github.com/Brum3ns/firefly/pkg/functions"
+	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
+	"github.com/Brum3ns/firefly/pkg/output"
+	"github.com/Brum3ns/firefly/pkg/parse"
+	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 //Combine `struct(s)` from other pkg sources into struct `Runner`

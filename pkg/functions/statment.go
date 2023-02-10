@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	d "github.com/Brum3ns/FireFly/pkg/design"
-	G "github.com/Brum3ns/FireFly/pkg/functions/globalVariables"
+	d "github.com/Brum3ns/firefly/pkg/design"
+	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
 )
 
 /** If there is an error then check what type to provide*/

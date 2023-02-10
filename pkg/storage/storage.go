@@ -3,7 +3,7 @@ package storage
 import (
 	"net/http"
 
-	"github.com/Brum3ns/FireFly/pkg/firefly/types"
+	"github.com/Brum3ns/firefly/pkg/firefly/types"
 )
 
 //[TODO] Move to struct in parse.Options + yml support

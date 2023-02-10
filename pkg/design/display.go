@@ -5,7 +5,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/Brum3ns/FireFly/pkg/storage"
+	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 func DisplayInfo(count int, result storage.Collection) {

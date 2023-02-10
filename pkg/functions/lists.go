@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strings"
 
-	G "github.com/Brum3ns/FireFly/pkg/functions/globalVariables"
-	"github.com/Brum3ns/FireFly/pkg/storage"
+	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
+	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 /**Take a list of []int and return the sum*/

@@ -6,9 +6,9 @@ import (
 	"reflect"
 	"strings"
 
-	fc "github.com/Brum3ns/FireFly/pkg/functions"
-	G "github.com/Brum3ns/FireFly/pkg/functions/globalVariables"
-	"github.com/Brum3ns/FireFly/pkg/storage"
+	fc "github.com/Brum3ns/firefly/pkg/functions"
+	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
+	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 type OutputData struct {
