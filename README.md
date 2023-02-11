@@ -42,7 +42,7 @@ If the above install method do not work try the following:
 ```
 git clone https://github.com/Brum3ns/firefly.git
 cd firefly/
-go build cmd/firefly.go
+go build cmd/firefly/firefly.go
 ./firefly -h
 ```
 
