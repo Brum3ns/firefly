@@ -4,8 +4,6 @@
   <br>
 </h1>
  
- <!--t-->
- 
 <p align="center">&lt/
   <a href="#advantages">Advantages</a> |
   <a href="#features">Features</a> |
@@ -15,9 +13,6 @@
 </p>
 
 Firefly is an advanced black-box fuzzer and not just a standard asset discovery tool. Firefly provides the advantage of testing a target with a large number of built-in checks to detect behaviors in the target.
-
-**Note:**
->  Firefly is in a very new stage (v1.0) but works well for now, if the target does not contain too much dynamic content. Firefly still detects and filters dynamic changes, but not yet perfectly.
 
 # Advantages
 - [x] Hevy use of gorutines and internal hardware for great preformance
