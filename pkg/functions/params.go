@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-/**Extract the 'parameter typ' (get, post, cookie) and the chars to use within each*/
+// Extract the 'parameter typ' (get, post, cookie) and the chars to use within each
 func GetParam(s string) map[string]string {
 	m := make(map[string]string)
 	m["post"] = "&"

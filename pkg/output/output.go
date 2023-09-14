@@ -3,96 +3,45 @@ package output
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
-	"strings"
-
-	fc "github.com/Brum3ns/firefly/pkg/functions"
-	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
-	"github.com/Brum3ns/firefly/pkg/storage"
+	"os"
+	"sync"
 )
 
-type OutputData struct {
-	data storage.Collection `json:"ID"`
-}
+var mutex sync.Mutex
 
-func Output(clt storage.Collection) error {
-	out := &OutputData{
-		data: clt,
+var (
+	prefix   = []byte("[\r\n")
+	suffix   = []byte("\r\n]")
+	filesize = 0
+)
+
+func WriteJSON(count int, f *os.File, result ResultFinal) error {
+	if !result.OK {
+		return nil
+	}
+	if count == 0 {
+		f.Write(prefix)
+		filesize += len(prefix)
 	}
 
-	m_data := OutputTemplate(out)
-
-	m_out := make(map[int]map[string]interface{})
-	m_out[clt.ID] = make(map[string]interface{})
-	m_out[clt.ID] = m_data
-
-	var output string
-	switch strings.ToLower(G.OutputType) {
-	case "json":
-
-		// outJson, err := json.MarshalIndent(out.data, "", "  ")
-		outJson, _ := json.Marshal(m_out)
-		output = string(outJson)
-
-	case "output":
-		l := []string{}
-		for k, i := range m_data {
-			l = append(l, fmt.Sprintf("%s: %v", k, i)) //DEBUG
-		}
-		output = strings.Join(l, "\n")
+	dataJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return err
 	}
-	fmt.Fprintf(G.OutputFileOS, "%s\n", output)
+
+	f.Write(dataJSON)
+	if err != nil {
+		return err
+	}
+
+	//Replace last binary characters and append the new JSON data to output file:
+	f.Write(suffix)
+
+	filesize += len(dataJSON)
+	filesize += len(suffix)
+
+	info, _ := f.Stat()
+	fmt.Println("size:", info.Size(), "|", filesize)
 
 	return nil
-}
-
-/**Setup what data that should be used within the output file*/
-func OutputTemplate(o *OutputData) map[string]interface{} {
-	var (
-		l_ignore = []string{
-			"body",
-			"icon",
-			"errors",
-			"haserr",
-			"threadid",
-			"valid",
-			"status",
-			"errmsg",
-			"tfmt_display",
-			"taskstatus",
-			"tfmt_ok",
-			"filter",
-
-			//[TODO] - Below will be added in later version(s)
-			"resperr",
-			"headersmatch",
-			"respdiff",
-			"regexmatch",
-		}
-
-		v    = reflect.ValueOf(o.data)
-		data = make(map[string]interface{}, v.NumField())
-		typ  = v.Type()
-	)
-
-	for i := 0; i < v.NumField(); i++ {
-		N := strings.ToLower(typ.Field(i).Name)
-
-		//If it's not in the 'ignore list' then add it to the output template:
-		if !fc.InLst(l_ignore, N) {
-			var V interface{}
-			V = v.Field(i).Interface()
-
-			//[TODO] - Add options to be able to save full bodies + headers
-			/* if N == "body" {
-				V = string(v.Field(i).Interface().([]byte))
-			} else {
-				V = v.Field(i).Interface()
-			}
-			*/
-			data[typ.Field(i).Name] = V
-		}
-	}
-
-	return data
 }

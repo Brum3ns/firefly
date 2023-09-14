@@ -1,183 +1,254 @@
 package runner
 
 import (
-	"net/http"
+	"fmt"
+	"log"
+	"os"
 	"sync"
 
 	"github.com/Brum3ns/firefly/pkg/design"
-	fc "github.com/Brum3ns/firefly/pkg/functions"
-	G "github.com/Brum3ns/firefly/pkg/functions/globalVariables"
+	"github.com/Brum3ns/firefly/pkg/files"
+	"github.com/Brum3ns/firefly/pkg/firefly/config"
+	"github.com/Brum3ns/firefly/pkg/firefly/verbose"
 	"github.com/Brum3ns/firefly/pkg/output"
-	"github.com/Brum3ns/firefly/pkg/parse"
-	"github.com/Brum3ns/firefly/pkg/storage"
+	"github.com/Brum3ns/firefly/pkg/prepare"
+	"github.com/Brum3ns/firefly/pkg/request"
+	"github.com/Brum3ns/firefly/pkg/scan"
+	"github.com/Brum3ns/firefly/pkg/verify"
 )
 
-//Combine `struct(s)` from other pkg sources into struct `Runner`
+// The runner should contain the structures needed for all the processes.
+// It must NOT contain structures that need to be modified and/or dynamicly changed once the process is running.
 type Runner struct {
-	mutex   sync.Mutex
-	options *parse.Options
-	client  *http.Client
-	//tmp_verifyData *storage.Temp_VerifyData
-	verifyData *storage.VerifyData
-	verifier   *Verifier
-	resp       *storage.Response
-	wordlist   *storage.Wordlists
-	collection *storage.Collection //[TODO] delete?
-	payloads   *storage.Payloads   //[TODO] delete?
-	//data     *storage.Analyze
-	/* analyze  *storage.Analyze
-	errors   *storage.Errors
-	Patterns *storage.Patterns */
-	verify bool
-	count  int
+	Count            int
+	VerifyMode       bool
+	OutputOK         bool
+	Conf             *config.Configure
+	Design           *design.Design
+	RequestTasks     *request.TaskStorage
+	ClientProperties *request.ClientProperties
+	Knowledge        Knowledge //<-Returned
+}
+type skipProcess struct {
+	tag string
+	err error
 }
 
-type Verifier struct {
-	Data map[int]struct {
-		Tag           string
-		URL           string
-		Payload       string
-		Body          string
-		HeadersString string
-		Headers       http.Header
-	}
+// The Knowledge structure contains variables that will be modified during the runner process
+// Note : (Runner's return data)
+type Knowledge struct {
+	Storage map[string][]verify.TargetKnowledge //(Original URL|Data of Verified behavior)
 }
 
-var VResp = &storage.VerifyData{}
-
-/**FireFly verify/fuzz runner
-* The runner spin up the core engine and execute all tasks including their own engine */
-func New(opt *parse.Options, wl *storage.Wordlists, V bool) (*Runner, error) {
+// Firefly verify/fuzz runner
+// The runner is the core process for all other child processes. It's preforming the requests and listen for responses from the target.
+// When a response has been collected it's sent to the engine that handle the hardware processes. It do so by spinning up a task for
+// each analyze process (aka: tasks).
+func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnowledge) (map[string][]verify.TargetKnowledge, error) {
 	runner := &Runner{
-		options:  opt,
-		wordlist: wl,
-		client:   Client(opt),
-		verifier: SetupVerifier(),
-		resp:     storage.ConfResp(),
-		//data:     &storage.Analyze{},
-		verify: V,
-		count:  0,
+		Count:      0,
+		Conf:       conf,
+		VerifyMode: (knowledgeStorage == nil),
+		OutputOK:   (len(conf.Output) > 0 && knowledgeStorage != nil),
+		Design:     design.NewDesign(),
+		ClientProperties: &request.ClientProperties{
+			Timeout: conf.Timeout,
+			Proxy:   conf.Proxy,
+			HTTP2:   conf.HTTP2,
+		},
+		RequestTasks: &request.TaskStorage{
+			URLs:            conf.URLs,
+			Schemes:         conf.Scheme,
+			Methods:         conf.Methods,
+			Headers:         conf.Headers,
+			PostData:        conf.PostData,
+			InsertPoint:     conf.Insert,
+			RandomUserAgent: conf.RandomAgent,
+			Payloads:        conf.Wordlist.GetAll(),
+		},
+		//Check if we already have verified data stored:
+		Knowledge: Knowledge{
+			Storage: verify.Prepare(knowledgeStorage),
+		},
 	}
 
-	if runner.verify {
-		runner.verifyData = storage.ConfVerifyData()
-	} else {
-		runner.verifyData = VResp
+	//Pre-Declare the output file and JSON encoder that will be used within the output process: (if set):
+	var (
+		outputFileWriter = &os.File{}
+		err              error
+	)
+
+	//Create output file and create a file writer (*if output file set*):
+	if runner.OutputOK {
+		if !files.FileExist(runner.Conf.Output) || runner.Conf.Overwrite {
+			outputFileWriter, err = os.OpenFile(runner.Conf.Output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if err = outputFileWriter.Truncate(0); err != nil {
+				log.Fatal(err)
+			}
+			if _, err = outputFileWriter.Seek(0, 0); err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			log.Fatalf("%s The specified output file already exists (\033[33m%s\033[0m), use the overwrite option to overwrite it.", design.STATUS.FAIL, runner.Conf.Output)
+		}
+		verbose.Show("Save result to output file: " + runner.Conf.Output)
 	}
 
 	var (
-		err     error
-		reqFail = 0
+		//Setup the [chan]nels and waitgroups for all the processes that will be preformed by the runner:
+		done            = make(chan bool)
+		doneRequests    = make(chan bool)
+		RequestAmount   = make(chan int)
+		skip            = make(chan skipProcess)
+		listenerScanner = make(chan scan.Result) //<- (listen for the scanner result for each HTTP response)
+		InterceptHTTP   = make(chan request.Result)
 	)
 
-	if G.Total, err = runner.SelectTotal(runner.verify); err != nil {
-		fc.IFError("p", err)
-	}
-
-	//Setup channels & Close all [chan]nels when everything is done (defer):
-	c_jobs := make(chan storage.Target, len(opt.Target["urls"]))
-	c_results := make(chan storage.Response, G.Total)
-	c_collection := make(chan storage.Collection, G.Total)
-	defer close(c_jobs)
-	defer close(c_results)
-	defer close(c_collection)
-
-	//[Threads|Requests] - Spinning up threads & send the jobs to the spawned threads:
-	for t := 1; t <= opt.Threads; t++ {
-		go Request(t, runner.client, opt, c_jobs, c_results)
-	}
-
-	//Give jobs to the request task (verify/fuzz):
-	if V {
-		JobsVerification(runner, c_jobs)
-	} else {
-		Jobs(runner, c_jobs)
-	}
-
-	//[Engine] start up the engine to run all tasks in the background:
+	//Track the statistic of the runners core and nested processes:
+	stats := newStatistic()
 	go func() {
-		for ; runner.count < (G.Total); runner.count++ {
-			result := <-c_results
-			//If the response 'status code' was "OK" without any error(s), then procce to engine:
-			if result.Status >= 1 {
+		stats.jobTotal = <-RequestAmount
+	}()
 
-				//[Engine]a Start the engine for all internal tasks:
-				runner.Engine(result.Id, result, c_collection) //[TODO] <= ('result\.R\.Id' is not nessacary u got 'result')
+	//Start the request handler and send requests to the target:
+	requestHandler := request.NewHandler(runner.ClientProperties, runner.RequestTasks, runner.Conf.Threads, runner.Conf.Delay, runner.VerifyMode)
+	go func() {
+		requestHandler.Run(InterceptHTTP, RequestAmount, doneRequests)
+		close(InterceptHTTP)
+		close(doneRequests)
+	}()
 
-				//If the response failed/timed-out return the status and reason of failure + count request fails:
-			} else {
-				reqFail++
-				c_collection <- storage.Collection{
-					Status: false,
-					ErrMsg: result.ErrMsg,
+	//[Listener] : Listen for the scanner result and make the final result:
+	go func() {
+		var mutex sync.Mutex
+		for stats.inProcess() {
+			//TODO - Loadingbar
+
+			select {
+			case scanResult := <-listenerScanner:
+				if scanResult.Error != nil {
+					stats.appendScannerError(scanResult.Error)
+					continue
+				}
+				stats.countScanner()
+
+				//Collect and store verify data (verification mode):
+				if runner.VerifyMode {
+					runner.AppendKnowledge(&mutex, scanResult)
+
+					//Analyze if the result is an unkown behavior:
+				} else if true {
+					//Send the result to the output file specified by the user:
+					if runner.OutputOK {
+						err := output.WriteJSON(stats.Output, outputFileWriter, scanResult.Output)
+						if err != nil {
+							log.Println(design.STATUS.ERROR, "Request ID:", scanResult.Output.RequestId, err)
+						}
+						stats.countOutput()
+					}
+					//Display the final result to the screen (CLI)
+					if !runner.Conf.NoDisplay {
+						output.DisplayCLI(stats.Completed, runner.Design, scanResult.Output)
+					}
+				}
+				stats.countComplete()
+
+			case s := <-skip:
+				stats.handleSkipped(s)
+				if s.err != nil {
+					runner.verbose(s.err)
 				}
 			}
 		}
+		//Send signal that all the runners process are completed:
+		done <- true
 	}()
 
-	//[Listener] Intercept tasks that are done and prepare verbose & output:
-	for id := 0; id <= (G.Total - 1); id++ {
-		count := (id + 1)
-		result := <-c_collection
+	// Prepare a new scanner engine with all the base properties:
+	scanEngine := scan.NewEngine(scan.Properties{
+		Scanner:       runner.Conf.Scanner,
+		Threads:       runner.Conf.ThreadsEngine,
+		PayloadVerify: conf.Options.VerifyPayload,
+	})
+	//Start the scanner in the background:
+	go scanEngine.Run(listenerScanner)
 
-		//If 50% verification requests failed, then exit: (not able to fuzz without knowing the target default behavior)
-		if runner.verify {
-			if reqFail >= (G.Total / 2) {
-				fc.IFFail("vreq")
+	//Intercept HTTP request/response results from the request handler and add the response as a job to the scanner engine:
+	for sendRequest := true; sendRequest; {
+		select {
+		case HttpResult := <-InterceptHTTP:
+			stats.countRequest()
+
+			//Check if any error appeared in the request/response process:
+			if HttpResult.Error != nil {
+				skip <- skipProcess{
+					tag: "error",
+					err: HttpResult.Error,
+				}
+				break
+
+				//Filter the HTTP response (if set):
+			} else if conf.Filter.Run(HttpResult.Response) {
+				skip <- skipProcess{
+					tag: "filter",
+				}
+				break
 			}
-			design.Loadingbar_Verify(id, G.Total)
 
-			runner.mutex.Lock()
-			runner.verifier.Data[result.ID] = struct {
-				Tag           string
-				URL           string
-				Payload       string
-				Body          string
-				HeadersString string
-				Headers       http.Header
-			}{
-				Tag:           result.Tag,
-				URL:           result.UrlNoPayload,
-				Payload:       result.Payload,
-				Body:          string(result.Body[:]),
-				HeadersString: fc.HeadersToStr(result.Headers),
-				Headers:       result.Headers,
-			}
-			runner.mutex.Unlock()
+			//Give the scanner engine job related to the Http result (request/response):
+			go func() {
+				//Add job to the scanner engine that runs in the background:
+				if runner.VerifyMode {
+					scanEngine.AddJob(runner.VerifyMode, HttpResult, nil)
+				} else {
+					scanEngine.AddJob(runner.VerifyMode, HttpResult, knowledgeStorage[HttpResult.TargetHashId])
+				}
+			}()
 
-		} else {
-			design.DisplayInfo(count, result)
-			/* if runner.options.ShowDiff {
-				//displayDiff := fmt.Sprintln(design.BlueLight, strings.Join(result.RespDiff[result.UrlNoPayload][result.Payload], "\n"), design.White)
-				fmt.Println(displayDiff)
-			} */
-
-			//Output result for each result:
-			if len(G.OutputFile) > 0 {
-				err := output.Output(result)
-				fc.IFError("p", err)
-			}
+		case <-doneRequests:
+			sendRequest = false
 		}
 	}
 
-	//Dynamic content extraction: (Don't run in a [go]rutine process)
-	if runner.verify {
-		VResp = runner.Verify()
+	//Wait until the runner is completed:
+	<-done
+
+	//Close the output file (if any output have been handled):
+	if runner.OutputOK {
+		if err := outputFileWriter.Close(); err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	return runner, nil
+	return runner.Knowledge.Storage, nil
 }
 
-/**Setup the Verifier struct for the verification process*/
-func SetupVerifier() *Verifier {
-	verifier := &Verifier{}
-	verifier.Data = make(map[int]struct {
-		Tag           string
-		URL           string
-		Payload       string
-		Body          string
-		HeadersString string
-		Headers       http.Header
-	})
-	return verifier
+func (r *Runner) verbose(msg any) {
+	if !r.Conf.Verbose {
+		return
+	}
+	icon := r.Design.INFO
+	switch msg.(type) {
+	case error:
+		icon = r.Design.ERROR
+	}
+	fmt.Fprintln(os.Stderr, icon, fmt.Sprintf("%v", msg))
+}
+
+func (r *Runner) AppendKnowledge(mutex *sync.Mutex, rs scan.Result) {
+	verifyStorage := verify.TargetKnowledge{
+		Payload:  rs.Output.Payload,
+		HTMLNode: prepare.GetHTMLNode(rs.Output.Response.Body),
+		Response: rs.Output.Response,
+		//Request:  rs.Output.Request,
+		//Behavior: rs.Output.Behavior,
+		//Scanner:  rs.Output.Scanner,
+	}
+
+	mutex.Lock()
+	r.Knowledge.Storage[rs.Output.TargetHashId] = append(r.Knowledge.Storage[rs.Output.TargetHashId], verifyStorage)
+	mutex.Unlock()
 }

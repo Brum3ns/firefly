@@ -2,67 +2,41 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
 	"time"
 
 	"github.com/Brum3ns/firefly/pkg/design"
-	fc "github.com/Brum3ns/firefly/pkg/functions"
-	"github.com/Brum3ns/firefly/pkg/parse"
+	"github.com/Brum3ns/firefly/pkg/fail"
+	"github.com/Brum3ns/firefly/pkg/firefly/config"
+	"github.com/Brum3ns/firefly/pkg/firefly/keypress"
+	"github.com/Brum3ns/firefly/pkg/firefly/precheck"
+	"github.com/Brum3ns/firefly/pkg/option"
 	"github.com/Brum3ns/firefly/pkg/runner"
-	"github.com/Brum3ns/firefly/pkg/storage"
 )
 
 func main() {
-	var (
-		opt = parse.UserArguments()
-		wl  = storage.ConfWordlist()
-	)
 
-	//Disclaimer text + Configure all data before starting the process:
+	//Check resources before starting (first time use):
+	precheck.Setup()
+
+	//Configure needed resources
+	opt := option.NewOptions()
+	conf := config.NewConfigure(opt)
+
 	design.Disclaimer()
-	design.InfoBanner(opt.ShowConfig)
 
-	//Configuration setup from given user input:
-	state, msg := parse.Configure(opt, wl)
-	if !state {
-		fc.IFFail(msg)
-	}
-	fmt.Println(design.OK, msg)
+	//Listen for user keypress input:
+	keypress.CTRL_C()
 
-	//Timer to track the process time:
 	timer := time.Now()
-
-	//Check for "CTRL +C" to stop the process and it's threads:
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		for range c {
-			fmt.Println("\n\r " + design.Warning + "CTRL+C pressed - ")
-			os.Exit(1)
-		}
-	}()
-
-	//Start Runners: Verification / Fuzz
-	VerifyResp, err := runner.New(opt, wl, true)
+	//Run the runner in verifyication process mode to detect normal behavior and patterns within the target:
+	KnowledgeStorage, err := runner.Run(conf, nil)
 	if err != nil {
-		fc.IFFail("vrunner")
+		fail.IFFail(1009)
 	}
+	//Run the black-box enumiration process:
+	runner.Run(conf, KnowledgeStorage)
 
-	Runner, err := runner.New(opt, wl, false)
-	if err != nil {
-		fc.IFFail("runner")
-	}
+	//Display summary of the process:
+	fmt.Printf(design.STATUS.OK+" Process finished in [%v], Success "+design.COLOR.GREEN+"%v"+design.COLOR.WHITE+"/\033[2;32m%v"+design.COLOR.WHITE+"]\n", time.Since(timer), 1337, 1337)
 
-	//[TODO] Add features (ATM just to ignore Golang variable "unused" error)
-	if VerifyResp == nil || Runner == nil {
-	}
-	/*====================================================================*/
-
-	fmt.Printf(design.OK+" Process finished in [%v], Success "+design.Green+"%v"+design.White+"/\033[2;32m%v"+design.White+"]\n", time.Since(timer), storage.Count_valid, storage.Count)
-
-	//Graph how FireFly adjusted itself under the process and what the target are likely to run in the clientside/backend:
-	/*//[GRAPH PRINTING] - [TODO make passive recon analyze and testing]
-	fmt.Println(">>", vRes.LstG_Tag)
-	adjust.Adjuster(vRes)*/
 }

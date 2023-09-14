@@ -1,6 +1,0 @@
-content-type
-age
-cf-cache
-X-Powered-By
-X-Fastly-Host
-X-Fastly-Debug

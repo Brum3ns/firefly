@@ -1,190 +1,228 @@
 package design
 
 import (
-	"flag"
 	"fmt"
-	"strings"
-	"time"
+	"strconv"
 )
 
-//static [Icons] and design variables:
+// Store all design values
+type Design struct {
+	Color
+	Icons
+	Debug
+	Detect
+	Status
+	Behavior
+}
+
+type Color struct {
+	WHITE       string
+	WHITEBG     string
+	BLACK       string
+	GREY        string
+	GREYLIGHT   string
+	GREYBG      string
+	RED         string
+	REDLIGHT    string
+	REDBG       string
+	ORANGE      string
+	ORANGELIGHT string
+	ORANGEBG    string
+	YELLOW      string
+	GREEN       string
+	GREENLIGHT  string
+	BLUE        string
+	BLUELIGHT   string
+	PINK        string
+	PURPEL      string
+}
+
+type Icons struct {
+	PLUS     string
+	AWARE    string
+	NEGATIVE string
+	POSSIBLE string
+}
+
+type Status struct {
+	OK       string
+	SUCCESS  string
+	INFO     string
+	FAIL     string
+	ERROR    string
+	WARNING  string
+	CRITICAL string
+}
+
+type Detect struct {
+	Firm      string
+	Certain   string
+	Tentative string
+}
+
+type Debug struct {
+	DEBUG   string
+	PAYLOAD string
+	INPUT   string
+	EXAMPLE string
+}
+
+type Behavior struct {
+	NONE           string
+	DIFF           string
+	TIME           string
+	REFLECT        string
+	TRANSFORMATION string
+	PATTERN        string
+}
+
+// static [Icons] and design variables:
 var (
-	Plus     = "[\033[1;32m+\033[0m]"
-	BeAware  = "[\033[1;33m!\033[0m]"
-	Negative = "[\033[1;31m-\033[0m]"
-	Possible = "[\033[1;33m?\033[0m]"
+	// Colors:
+	COLOR = &Color{
+		WHITE:       "\033[0m",
+		WHITEBG:     "\033[47m",
+		BLACK:       "\033[30m",
+		GREY:        "\033[90m",
+		GREYLIGHT:   "\033[1;90m",
+		GREYBG:      "\033[1;40m",
+		RED:         "\033[31m",
+		REDLIGHT:    "\033[1:31m",
+		REDBG:       "\033[1;41m",
+		ORANGE:      "\033[33m",
+		ORANGELIGHT: "\033[1;33m",
+		ORANGEBG:    "\033[43m",
+		YELLOW:      "\033[93m",
+		GREEN:       "\033[32m",
+		GREENLIGHT:  "\033[1;32m",
+		BLUE:        "\033[34m",
+		BLUELIGHT:   "\033[36m",
+		PINK:        "\033[1;35m",
+		PURPEL:      "\033[35m",
+	}
 
-	OK       = "[\033[32mOK\033[0m]"
-	Success  = "[\033[1;32mOK\033[0m]"
-	Info     = "[\033[34mINF\033[0m]"
-	Fail     = "[\033[31mFAI\033[0m]"
-	Warning  = "[\033[33mWAR\033[0m]"
-	Critical = "[\033[1;41mCRITICAL\033[0m]"
-	Debug    = "[\033[36mDEBUG\033[0m]"
-	Payload  = "[\033[32mPAYLOAD\033[0m]"
-	Example  = "\033[33mExemple\033[0m:"
+	DETECT = &Detect{
+		Certain:   (COLOR.REDBG + ("Certain") + COLOR.WHITE),
+		Firm:      (COLOR.ORANGEBG + ("Firm") + COLOR.WHITE),
+		Tentative: (COLOR.GREYBG + ("Tentative") + COLOR.WHITE),
+	}
 
-	Null      = "--------"
-	Reflect   = "\033[130;100mReflect\033[0m"
-	RespError = "\033[130;41mRespErr\033[0m"
-	XSS       = "\033[_COLOR_mXSS\033[0m"
+	ICON = &Icons{
+		PLUS:     ("[" + COLOR.GREENLIGHT + ("+") + COLOR.WHITE + "]"),
+		AWARE:    ("[" + COLOR.ORANGELIGHT + ("!") + COLOR.WHITE + "]"),
+		NEGATIVE: ("[" + COLOR.REDLIGHT + ("-") + COLOR.WHITE + "]"),
+		POSSIBLE: ("[" + COLOR.ORANGELIGHT + ("?") + COLOR.WHITE + "]"),
+	}
 
-	White       = "\033[0m"
-	WhiteBG     = "\033[47m"
-	Black       = "\033[30m"
-	Grey        = "\033[90m"
-	GreyLight   = "\033[1;90m"
-	Red         = "\033[31m"
-	RedLight    = "\033[1:31m"
-	Orange      = "\033[33m"
-	OrangeLight = "\033[1;33m"
-	Yellow      = "\033[93m"
-	Green       = "\033[32m"
-	GreenLight  = "\033[1;32m"
-	Blue        = "\033[34m"
-	BlueLight   = "\033[36m"
-	Pink        = "\033[1;35m"
-	Purpel      = "\033[35m"
+	STATUS = &Status{
+		OK:       ("[" + COLOR.GREEN + ("OK") + COLOR.WHITE + "]"),
+		SUCCESS:  ("[" + COLOR.GREENLIGHT + ("OK") + COLOR.WHITE + "]"),
+		INFO:     ("[" + COLOR.BLUE + ("INF") + COLOR.WHITE + "]"),
+		FAIL:     ("[" + COLOR.RED + ("FAI") + COLOR.WHITE + "]"),
+		WARNING:  ("[" + COLOR.ORANGE + ("WAR") + COLOR.WHITE + "]"),
+		ERROR:    (COLOR.REDBG + ("ERROR") + COLOR.WHITE),
+		CRITICAL: (COLOR.REDBG + ("CRITICAL") + COLOR.WHITE),
+	}
 
-	BG_Red = "\033[1;41m"
+	DEBUG = &Debug{
+		DEBUG:   ("[" + COLOR.BLUELIGHT + ("DEBUG") + COLOR.WHITE + "]"),
+		PAYLOAD: ("[" + COLOR.GREEN + ("PAYLOAD") + COLOR.WHITE + "]"),
+		INPUT:   ("[" + COLOR.BLUELIGHT + ("INPUT") + COLOR.WHITE + "]"),
+		EXAMPLE: (COLOR.ORANGE + ("Exemple") + COLOR.WHITE),
+	}
+
+	BEHAVIOR = &Behavior{
+		NONE:           ("----"),
+		TRANSFORMATION: (COLOR.REDBG + ("Tfmt") + COLOR.WHITE),
+		DIFF:           (COLOR.REDBG + ("Diff") + COLOR.WHITE),
+		TIME:           (COLOR.ORANGEBG + ("Time") + COLOR.WHITE),
+		REFLECT:        (COLOR.GREYBG + ("Reflect") + COLOR.WHITE),
+		PATTERN:        (COLOR.ORANGEBG + ("Pattern") + COLOR.WHITE),
+	}
+
+	// Colorized HTTP status codes:
+	STATUSCODE_COLOR = map[int]string{
+		//(Default Status code colors)
+		1: (COLOR.GREYLIGHT + "{CODE}" + COLOR.WHITE),
+		2: (COLOR.GREENLIGHT + "{CODE}" + COLOR.WHITE),
+		3: (COLOR.BLUELIGHT + "{CODE}" + COLOR.WHITE),
+		4: (COLOR.PURPEL + "{CODE}" + COLOR.WHITE),
+		5: (COLOR.PINK + "{CODE}" + COLOR.WHITE),
+		//(100)
+		100: (COLOR.GREY + "100" + COLOR.WHITE),
+		//(200)
+		200: (COLOR.GREEN + "200" + COLOR.WHITE),
+		//(300)
+		301: (COLOR.BLUELIGHT + "301" + COLOR.WHITE),
+		302: (COLOR.BLUE + "302" + COLOR.WHITE),
+		//(404)
+		400: (COLOR.PURPEL + "400" + COLOR.WHITE),
+		404: (COLOR.GREY + "404" + COLOR.WHITE),
+		403: (COLOR.RED + "403" + COLOR.WHITE),
+		429: (COLOR.REDBG + "429" + COLOR.WHITE),
+		//(500)
+		500: (COLOR.PINK + "500" + COLOR.WHITE),
+		501: (COLOR.PINK + "501" + COLOR.WHITE),
+		502: (COLOR.YELLOW + "502" + COLOR.WHITE),
+		503: (COLOR.ORANGELIGHT + "503" + COLOR.WHITE),
+	}
 )
 
-func InfoBanner(show bool) {
-	fmt.Println(strings.Repeat("_", 64), "\n\r")
-
-	if show {
-		flag.VisitAll(func(f *flag.Flag) {
-
-			lenName := len(fmt.Sprintf("%v", f.Value))
-			Name := fmt.Sprintf("%v", f.Name)
-			var value string
-			if lenName > 0 && len(Name) > 2 {
-				if Name == "raw" {
-					value = "HTTP Raw"
-				} else {
-					value = fmt.Sprintf("%v", f.Value)
-				}
-				fmt.Printf(" :: %s\r\t\t\t: %s\n", strings.Title(f.Name), value)
-			}
-		})
-		fmt.Println(strings.Repeat("_", 64), "\n\r")
-		time.Sleep(2000 * time.Millisecond)
+func NewDesign() *Design {
+	return &Design{
+		Color:    *COLOR,
+		Debug:    *DEBUG,
+		Icons:    *ICON,
+		Detect:   *DETECT,
+		Status:   *STATUS,
+		Behavior: *BEHAVIOR,
 	}
 }
 
-func Colortxt(s, c string, clean bool) string {
-	/** Change color of text
-	 */
-	var txt string
-	switch c {
-	case "r":
-		c = Red
-	case "lr":
-		c = RedLight
-	case "br":
-		c = BG_Red
-	case "g":
-		c = Green
-	case "lg":
-		c = GreenLight
-	case "b":
-		c = Blue
-	case "lb":
-		c = BlueLight
-	case "o":
-		c = Orange
-	case "lo":
-		c = OrangeLight
-	case "y":
-		c = Yellow
-	case "p":
-		c = Pink
-	case "P":
-		c = Purpel
-	case "B":
-		c = Black
-
-	default:
-		c = White
+// Colorize the status code and return it as a string
+func (d *Design) StatusCode(code int) string {
+	if v, ok := STATUSCODE_COLOR[code]; ok {
+		return v
+	} else if v, ok := STATUSCODE_COLOR[code/100]; ok {
+		return v
 	}
-
-	if clean {
-		txt = (c + s + White)
-	} else {
-		txt = ("(" + (c + s + White) + ")")
-	}
-
-	return txt
+	return fmt.Sprintf("\033[31m%d\033[0m", code)
 }
 
-func Disclaimer() {
-	fmt.Println(BeAware + " Stay ethical. The creator of the tool is not responsible for any misuse or damage.")
+// Colorize the word count and return it as a string
+func (d *Design) WordCount(wordCount int) string {
+	return d.Color.BLUELIGHT + strconv.Itoa(wordCount) + d.Color.WHITE
 }
 
-func Color_boolean(b bool) string {
-	var booleanColor string
-
-	if b {
-		booleanColor = GreenLight + fmt.Sprint(b) + White
-	} else {
-		booleanColor = Blue + fmt.Sprint(b) + White
-	}
-
-	return booleanColor
+// Colorize the word line and return it as a string
+func (d *Design) LineCount(lineCount int) string {
+	return d.Color.BLUE + strconv.Itoa(lineCount) + d.Color.WHITE
 }
 
-func Color_StatusCode(status_code string) string {
-	//Check recived *status codes* and add color to it:
-
-	switch string(status_code)[0:1] {
-	case "2": //Status: 200
-		status_code = fmt.Sprintf(Green + status_code + White)
-	case "3": //Status: 300
-		switch status_code {
-		case "301":
-			status_code = fmt.Sprintf(BlueLight + status_code + White)
-		case "302":
-			status_code = fmt.Sprintf(Blue + status_code + White)
-		default:
-			status_code = fmt.Sprintf(BlueLight + status_code + White)
-		}
-	case "1": //Status: 100
-		status_code = fmt.Sprintf(Grey + status_code + White)
-	case "4": //Status: 400
-		switch status_code {
-		case "404":
-			status_code = fmt.Sprintf(Grey + status_code + White)
-		case "403":
-			status_code = fmt.Sprintf(BG_Red + status_code + White)
-		case "429":
-			status_code = fmt.Sprintf(BG_Red + status_code + White)
-		case "400":
-			status_code = fmt.Sprintf(Purpel + status_code + White)
-		default:
-			status_code = fmt.Sprintf(Blue + status_code + White)
-		}
-	case "5": //Status: 500
-		switch status_code {
-		case "502":
-			status_code = fmt.Sprintf(Yellow + status_code + White)
-		case "503":
-			status_code = fmt.Sprintf(OrangeLight + status_code + White)
-		case "504":
-			status_code = fmt.Sprintf(Yellow + status_code + White)
-		default:
-			status_code = fmt.Sprintf(OrangeLight + status_code + White)
-		}
-	}
-
-	return status_code
+// Colorize the Content Type header value and return it as a string
+func (d *Design) ContentType(contentType string) string {
+	return d.Color.PURPEL + contentType + d.Color.WHITE
 }
 
-func Color_Time(respTime float64) string {
+// Colorize the Content Length and return it as a string
+func (d *Design) ContentLength(contentLength int) string {
+	return d.Color.PINK + strconv.Itoa(contentLength) + d.Color.WHITE
+}
+
+// Colorize the response time and return it as a string
+func (d *Design) ResponseTime(time float64) string {
 	//Check recived *response time* and add color to it if it's odd from the original responses:
-
-	if respTime > 4 {
-		return fmt.Sprintf("\033[31m%.3f\033[0m", respTime)
+	if time > 7 {
+		return fmt.Sprintf("\033[31m%.4f\033[0m", time)
 	}
+	return fmt.Sprintf("\033[1:38m%.4f\033[0m", time)
+}
 
-	return fmt.Sprintf("%.3f", respTime)
+// Colorize the Content Length and return it as a string
+func (d *Design) IsDiff(value int) string {
+	v := strconv.Itoa(value)
+	if value != 0 {
+		return d.Color.REDBG + v + d.Color.WHITE
+	}
+	return v
 }

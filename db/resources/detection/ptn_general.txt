@@ -1,0 +1,332 @@
+passthru
+shell_exec
+system
+phpinfo
+base64_decode
+chmod
+mkdir
+fopen
+fclose
+readfile
+php_uname
+eval
+edoced_46esab
+popen
+include
+create_function
+mysql_execute
+php_uname
+proc_open
+pcntl_exec
+include_once
+require
+require_once
+posix_mkfifo
+posix_getlogin
+posix_ttyname
+getenv
+get_current_user
+proc_get_status
+get_cfg_var
+disk_free_space
+disk_total_space
+diskfreespace
+getcwd
+getlastmo
+getmygid
+getmyinode
+getmypid
+getmyuid
+assert
+extract
+parse_str
+putenv
+CouchDB
+reverse proxy
+internal error
+internal crash
+internal system
+cpanel
+ini_set
+pfsockopen
+fsockopen
+apache_child_terminate
+posix_kill
+aspadmin
+asp_client
+backup file
+cgi-bin
+wp-plugins
+wp-themes
+wp-content
+wp-install
+wp-admin
+wp-administrator
+wp-login
+config.txt
+cgi-exe
+cgi-home
+cgi-local
+cgi-perl
+cgi-sys
+cgi-win
+cgibin
+cgis
+_vti_aut
+_vti_bin
+_vti_cnf
+_vti_log
+_vti_pvt
+_vti_rpc
+_admin
+servlet
+jsp-example
+tomcat-docs
+webdav
+org.apache
+org.nginx
+org.tomcat
+org.drupal
+apache.
+nginx.
+durpal.
+tomcat.
+posix_setpgid
+posix_setsid
+posix_setuid
+tmpfile
+bzopen
+gzopen
+chgrp
+chown
+copy
+file_put_contents
+lchgrp
+lchown
+link
+register_error_handler
+HTTPException
+mkdir
+move_uploaded_file
+symlink
+tempnam
+imagecreatefromgif
+imagecreatefromjpeg
+imagecreatefrompng
+imagecreatefromwbmp
+imagecreatefromxbm
+imagecreatefromxpm
+ftp_put
+ftp_nb_put
+exif_read_data
+read_exif_data
+exif_thumbnail
+exif_imagetype
+hash_file
+hash_hmac_file
+hash_update_file
+md5_file
+sha1_file
+highlight_file
+show_source
+php_strip_whitespace
+get_meta_tags
+str_repeat
+unserialize
+register_tick_function
+register_shutdown_function
+getuid
+uname
+encryption-key
+api-key
+secret-token
+token-key
+key-token
+key.txt
+secret.txt
+password.txt
+credentials
+wombat
+encryptionkey
+secretkey
+aeskey
+openssh
+ftp server
+secret data
+private files
+private folder
+administrator.php
+welcome administrator
+welcome admin
+your password is
+passphrase
+update set =
+insert set =
+like '%
+where password =
+where username =
+where query =
+gethostname
+log.txt
+logs.txt
+index of /
+[ ok ]
+[ fail ]
+[ success ]
+[ info ]
+[ information ]
+[ error ]
+echo 
+$_GET
+$_POST
+$_SERVER
+$_REQUEST
+file_include
+file_get_contents
+fopen(
+fsocket(
+addeventlistener
+shell_exec
+eval(
+exec(
+system(
+server-status
+CPU usage
+logging
+$sql
+$query
+$password
+remove before production
+localhost
+admin.sql
+backup.php
+backup.txt
+python
+golang
+ruby
+twig
+jinja
+api_key
+api_secret_key
+secret_key
+PRIVATE_KEY
+private_key
+Arrays.equals
+mt_rand
+encrypt
+MCRYPT
+RIJNDAEL
+MCRYPT_RIJNDAEL_256
+hashlib
+bcrypt
+$2a$
+PBKDF2
+blake2
+vulnerable
+popen(
+backtick operator
+pcntl_exec
+preg_replace
+create_function
+passthru
+system
+shell_exec
+proc_open
+pcntl_exec
+create_function
+include(
+include_once
+require_once
+phpinfo
+posix_mkfifo
+posix_getlogin
+posix_ttyname
+getenv
+get_current_user
+proc_get_status
+get_cfg_var
+disk_free_space
+disk_total_space
+diskfreespace
+getcwd
+getlastmo
+getmygid
+getmyinode
+getmypid
+getmyuid
+parse_str
+putenv
+ini_set
+proc_nice
+proc_terminate
+proc_close
+pfsockopen
+fsockopen
+apache_child_terminate
+posix_kill
+posix_mkfifo
+posix_setpgid
+posix_setsid
+posix_setuid
+chmod
+chown
+shell=True
+pickle.loads
+yaml.load
+debug
+DebuggedApplication
+Debug=True
+evalex=True
+python pickle
+flask pickle
+function pickle
+client-app
+asp-client
+admin.php
+administrator.php
+admin.asp
+backup.sql
+database.php
+phpmyadmin.php
+administrator.asp
+.DB_STORE
+private.php
+upload.php
+file.php
+files.php
+admin.asp
+administrator.asp
+admin.rb
+administrator.rb
+default password=
+default password:
+default password =
+//remove
+//delete
+<!--delete
+<!--remove
+<!-- delete
+<!-- remove
+/*delete
+/*remove
+/*[todo]
+getQuery =
+QueryString = 
+urlParams =
+urlParam =
+getQuery=
+QueryString= 
+urlParams=
+urlParam=
+URLSearchParams(
+location.pathname
+location.search
+innerHTML(location.href
+innerHTML(location.pathname
+innerHTML(location.search
+.split('&')
+.split("&")
+.split("&")[
+.split('&')[
+.split('?')[
+.split("?")[

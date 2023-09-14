@@ -1,3 +1,0 @@
-/!\ Do not change these filenames.
-
-- You can add/change the content inside the files however you like

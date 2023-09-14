@@ -2,14 +2,52 @@ package functions
 
 import (
 	"fmt"
-	"regexp"
+	"reflect"
 	"strconv"
 	"strings"
-	"time"
 	"unicode/utf8"
 )
 
-/**Take any string and encode to valid utf-8/ASCII. Return new string*/
+func Float(itf interface{}) (float64, error) {
+	var floatType = reflect.TypeOf(float64(0))
+
+	v := reflect.Indirect(reflect.ValueOf(itf))
+	if !v.Type().ConvertibleTo(floatType) {
+		return 0, fmt.Errorf("cannot convert %v to float64", v.Type())
+	}
+	fv := v.Convert(floatType)
+	return fv.Float(), nil
+}
+
+// String to int (ignore errors)
+func Int(s string) int {
+	i, _ := strconv.Atoi(s)
+	return i
+}
+
+// Int to string (ignore errors)
+func Str(i int) string {
+	s := strconv.Itoa(i)
+	return s
+}
+
+// Remove duplicates from a map
+func RmDup_m(m map[string][]string) []string {
+	var (
+		mp = make(map[string]int)
+		l  []string
+	)
+	for _, lst := range m {
+		for _, i := range lst {
+			if mp[i] == 0 {
+				l = append(l, i)
+			}
+		}
+	}
+	return l
+}
+
+// Take any string and encode to valid utf-8/ASCII. Return new string
 func RuneToASCII(str string) string {
 	var (
 		s string
@@ -27,37 +65,6 @@ func RuneToASCII(str string) string {
 	return s
 }
 
-func MapToString(m map[string]string, sep string) string {
-	var str string
-
-	for key, value := range m {
-		str += fmt.Sprintf("%s%s%s", key, sep, value)
-	}
-
-	return str
-}
-
-func RandomCase(str string) string {
-	var (
-		randInt   = time.Now().UnixNano() % 2
-		wildcard  = 0
-		wildforce = 0
-	)
-
-	if (wildcard < 3 || wildforce > 3) && randInt == 0 {
-		wildforce = 0
-		wildcard++
-
-		str = strings.ToUpper(str)
-
-	} else {
-		wildcard = 0
-		wildforce++
-	}
-
-	return str
-}
-
 func CheckSubstrings(str string, subs ...string) int {
 	m := 0
 	for _, sub := range subs {
@@ -69,39 +76,6 @@ func CheckSubstrings(str string, subs ...string) int {
 	}
 
 	return m
-}
-
-func RegexBetween(str, re string) string {
-	/** Take a regex and check what's character(s) is/are inbetween
-	 */
-
-	var s string
-
-	//Example take hostnames from url > `http?://*(.*?)*/`
-	r := regexp.MustCompile(re)
-	mS := r.FindAllStringSubmatch(str, -1)
-	for _, v := range mS {
-		s = v[1]
-	}
-
-	return s
-}
-
-/** Take a regex and check what's character(s) is/are inbetween*/
-func RegexBetweenLst(str, re string) []string {
-	var l []string
-
-	//Example take hostnames from url > `http?://*(.*?)*/`
-	r := regexp.MustCompile(re)
-	mS := r.FindAllStringSubmatch(str, -1)
-
-	for _, v := range mS {
-		if !InLstAll(l, v[1]) {
-			l = append(l, v[1])
-		}
-	}
-
-	return l
 }
 
 func Err_Highlight(lE, l []string) string {
@@ -116,20 +90,12 @@ func Err_Highlight(lE, l []string) string {
 	return s
 }
 
-func LineIn(lb []byte) int { //OLD
-	return len(strings.Split(string(lb[:]), "\n"))
-}
-
-func WordIn(lb []byte) int { //OLD
-	return len(strings.Fields(string(lb[:])))
-}
-
-/** Count lines in a string*/
+// Count words in a string
 func WordCount(s string) int {
 	return len(strings.Fields(s))
 }
 
-/** Count words in a string*/
+// Count lines in a string
 func LineCount(s string) int {
 	return len(strings.Split(s, "\n"))
 }

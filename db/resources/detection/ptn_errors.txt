@@ -1,0 +1,112 @@
+syntax error
+fatal error
+parse error
+notice error
+warning Error
+error in line
+[object Object]
+php:
+<?php
+<%=
+$_GET
+$_POST
+$_SERVER
+$_REQUEST
+there was an error
+server error
+check the manual
+syntax to use
+you have an error
+sql error
+42000-176
+sql statement
+database error
+A syntax error has occurred
+ADODB.Field error
+ASP.NET is configured to show verbose error messages
+ASP.NET_SessionId
+Active Server Pages error
+An illegal character has been found in the statement
+An unexpected token "END-OF-STATEMENT" was found
+CLI Driver
+Can't connect to local
+Custom Error Message
+DB2 Driver
+DB2 Error
+DB2 ODBC
+Died at
+Disallowed Parent Path
+Unexpected path
+Unexpected backend error
+Error Diagnostic Information
+Error Message
+Error loading required libraries
+Error Report
+Error converting data type varchar to numeric
+Fatal error
+Incorrect syntax near
+Index of
+Internal Server Error
+Invalid Path Character
+Invalid procedure call or argument
+Invision Power Board Database Error
+JDBC
+OLE DB Provider
+ODBC Drivers
+VBScript compilation error
+VBScript error
+MySQL
+MySQL Driver
+MySQL Error
+MySQL ODBC
+ODBC
+OLE/DB
+provider returned message
+ORA-
+Oracle DB2
+Oracle Driver
+Oracle Error
+Oracle ODBC
+PHP Error
+PHP Parse error
+PHP Warning
+Permission denied: 'GetObject'
+PostgreSQL query failed: ERROR: parser: parse error
+SQL Server Driver][SQL Server
+SQL command not properly ended
+SQLException
+not a valid PostgreSQL result
+Syntax error in query expression
+The error occurred in
+The script whose uid is
+Type mismatch
+Unable to jump to row
+Unclosed quotation mark before the character string
+Unterminated string constant
+Cannot modify header information
+headers already sent
+File-Handle
+Warning:
+mysql_query()
+pg_connect()
+FATAL
+You have an error in your SQL syntax
+data source=
+detected an internal error [IBM][CLI Driver][DB2/6000]
+error
+include_path
+invalid query
+missing expression
+mySQL error with query
+mysql error
+on MySQL result index
+server object error
+supplied argument is not a valid MySQL result resource
+unexpected end of SQL command
+_self
+__self
+root:x:0
+www-data
+/usr/bin
+php-version
+php:
