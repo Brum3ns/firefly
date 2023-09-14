@@ -1,6 +1,6 @@
 
 <h1 align="center">
-  <img src="fireflyLogo.png" alt="firefly" width="220px">
+  <img src="assets/fireflyLogo.png" alt="firefly" width="220px">
   <br>
 </h1>
  
@@ -30,7 +30,7 @@ Firefly is an advanced black-box fuzzer and not just a standard asset discovery 
 
 # Features
 <h1 align="center">
-  <img src="fireflyOptions.png" alt="fireflyOptions" width="100%">
+  <img src="assets/fireflyOptions.png" alt="fireflyOptions" width="100%">
   <br>
 </h1>
 
