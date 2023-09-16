@@ -19,6 +19,11 @@
 go.work
 
 # General
+**/*logs
+**/*.log
+**/*cache
+**/*tmp
+**/*temp
 **/*bak
 **/*bakup
 **/*.bak
