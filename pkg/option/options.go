@@ -268,7 +268,7 @@ func NewOptions() *Options {
 	flag.BoolVar(&opt.Verbose, "v", false, "Display Verbose")
 
 	//- [ Wordlist ] -
-	flag.StringVar(&opt.wordlistPath, "w", "", "Wordlist to be used. A single wordlist can be selected or a folder containing wordlists (files must have an \"txt\" extension if a folder is used)"+exampleValues("\"/path/to/wordlist.txt\""))
+	flag.StringVar(&opt.wordlistPath, "w", global.DIR_WORDLIST, "Wordlist to be used. A single wordlist can be selected or a folder containing wordlists (files must have an \"txt\" extension if a folder is used)"+exampleValues("\"/path/to/wordlist.txt\""))
 
 	//- [ Output ] -
 	flag.StringVar(&opt.Output, "o", "", "Output result to given file (JSON format)")
