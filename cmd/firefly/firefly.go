@@ -29,14 +29,21 @@ func main() {
 
 	timer := time.Now()
 	//Run the runner in verifyication process mode to detect normal behavior and patterns within the target:
-	KnowledgeStorage, err := runner.Run(conf, nil)
+	KnowledgeStorage, _, err := runner.Run(conf, nil)
 	if err != nil {
 		fail.IFFail(1009)
 	}
 	//Run the black-box enumiration process:
-	runner.Run(conf, KnowledgeStorage)
+	_, Statistic, _ := runner.Run(conf, KnowledgeStorage)
 
 	//Display summary of the process:
-	fmt.Printf(design.STATUS.OK+" Process finished in [%v], Success "+design.COLOR.GREEN+"%v"+design.COLOR.WHITE+"/\033[2;32m%v"+design.COLOR.WHITE+"]\n", time.Since(timer), 1337, 1337)
-
+	fmt.Printf(
+		":: Process finished: Requests/Responses:[%d/%d], Completed:[\033[1;32m%d\033[0m], Filtered:[\033[1;36m%d\033[0m], Failed:[\033[31m%d\033[0m], Time:[%v]\n",
+		Statistic.Request.Count,
+		Statistic.Response,
+		Statistic.Completed,
+		Statistic.Request.Filtered,
+		Statistic.Failed,
+		time.Since(timer),
+	)
 }

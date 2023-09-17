@@ -5,15 +5,15 @@ import (
 	"sync"
 )
 
-type Statistics struct {
-	jobTotal  int   `json:"Jobs"` //!Note : (Must be declared all at once. Not one by one)
-	Failed    int   `json:"Failed"`
-	Responses int   `json:"Responses"`
-	Completed int   `json:"Completed"`
-	Output    int   `json:"OutputCount"`
-	Request   *Data `json:"Request"`
-	Scanner   *Data `json:"Scanner"`
-	Mutex     sync.Mutex
+type Statistic struct {
+	TotalRequests int   `json:"Jobs"` //!Note : (Must be declared all at once. Not one by one)
+	Failed        int   `json:"Failed"`
+	Response      int   `json:"Responses"`
+	Completed     int   `json:"Completed"`
+	Output        int   `json:"OutputCount"`
+	Request       *Data `json:"Request"`
+	Scanner       *Data `json:"Scanner"`
+	Mutex         sync.Mutex
 }
 type Data struct {
 	Count         int           `json:"Count"`
@@ -22,19 +22,26 @@ type Data struct {
 	ErrorMessages map[error]int `json:"ErrorMessages"`
 }
 
-func newStatistic() *Statistics {
-	return &Statistics{
+func newStatistic() *Statistic {
+	return &Statistic{
 		Request: &Data{ErrorMessages: make(map[error]int)},
 		Scanner: &Data{ErrorMessages: make(map[error]int)},
 	}
 }
 
-// Return the current status and a true boolean if it still have processes to handle, otherwise false.
-func (st *Statistics) inProcess() bool {
-	return !(st.jobTotal > 0 && st.jobTotal == st.getTotal())
+func (st *Statistic) ReqInSec() int {
+	if st.TotalRequests <= 0 {
+		return 0
+	}
+	return 0
 }
 
-func (st *Statistics) handleSkipped(skip skipProcess) {
+// Return the current status and a true boolean if it still have processes to handle, otherwise false.
+func (st *Statistic) inProcess() bool {
+	return !(st.TotalRequests > 0 && st.TotalRequests == st.getTotal())
+}
+
+func (st *Statistic) handleSkipped(skip skipProcess) {
 	if skip.tag == "filter" {
 		st.countFilter()
 	} else if skip.tag == "error" {
@@ -45,36 +52,40 @@ func (st *Statistics) handleSkipped(skip skipProcess) {
 	}
 }
 
-func (st *Statistics) getTotal() int {
+func (st *Statistic) getTotal() int {
 	return (st.Completed + st.Failed + st.Request.Filtered)
 }
 
-func (st *Statistics) countOutput() {
+func (st *Statistic) countOutput() {
 	st.Output++
 }
 
-func (st *Statistics) countComplete() {
+func (st *Statistic) countComplete() {
 	st.Completed++
 }
 
-func (st *Statistics) countFail() {
+func (st *Statistic) countFail() {
 	st.Failed++
 }
 
-func (st *Statistics) countFilter() {
+func (st *Statistic) countFilter() {
 	st.Request.Filtered++
 }
 
-func (st *Statistics) countRequest() {
+func (st *Statistic) countRequest() {
 	st.Request.Count++
 }
 
-func (st *Statistics) countScanner() {
+func (st *Statistic) countResponse() {
+	st.Response++
+}
+
+func (st *Statistic) countScanner() {
 	st.Scanner.Count++
 }
 
 // Add a new request error to the runner statistics instant
-func (st *Statistics) appendRequestError(err error) {
+func (st *Statistic) appendRequestError(err error) {
 	if err != nil {
 		st.Mutex.Lock()
 		st.Request.ErrorMessages[err]++
@@ -84,7 +95,7 @@ func (st *Statistics) appendRequestError(err error) {
 }
 
 // Add a new scanner error to the runner statistics instant
-func (st *Statistics) appendScannerError(err error) {
+func (st *Statistic) appendScannerError(err error) {
 	if err != nil {
 		st.Mutex.Lock()
 		st.Scanner.ErrorMessages[err]++

@@ -44,7 +44,7 @@ type Knowledge struct {
 // The runner is the core process for all other child processes. It's preforming the requests and listen for responses from the target.
 // When a response has been collected it's sent to the engine that handle the hardware processes. It do so by spinning up a task for
 // each analyze process (aka: tasks).
-func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnowledge) (map[string][]verify.TargetKnowledge, error) {
+func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnowledge) (map[string][]verify.TargetKnowledge, Statistic, error) {
 	runner := &Runner{
 		Count:      0,
 		Conf:       conf,
@@ -110,7 +110,7 @@ func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnow
 	//Track the statistic of the runners core and nested processes:
 	stats := newStatistic()
 	go func() {
-		stats.jobTotal = <-RequestAmount
+		stats.TotalRequests = <-RequestAmount
 	}()
 
 	//Start the request handler and send requests to the target:
@@ -182,16 +182,20 @@ func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnow
 		case HttpResult := <-InterceptHTTP:
 			stats.countRequest()
 
-			//Check if any error appeared in the request/response process:
-			if HttpResult.Error != nil {
+			//Check if we got a valid HTTP response from our requested target or if any error appeared:
+			if HttpResult.Error == nil {
+				stats.countResponse()
+
+			} else {
 				skip <- skipProcess{
 					tag: "error",
 					err: HttpResult.Error,
 				}
 				break
+			}
 
-				//Filter the HTTP response (if set):
-			} else if conf.Filter.Run(HttpResult.Response) {
+			//Filter the HTTP response (if set):
+			if conf.Filter.Run(HttpResult.Response) {
 				skip <- skipProcess{
 					tag: "filter",
 				}
@@ -223,7 +227,7 @@ func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnow
 		}
 	}
 
-	return runner.Knowledge.Storage, nil
+	return runner.Knowledge.Storage, *stats, nil
 }
 
 func (r *Runner) verbose(msg any) {
