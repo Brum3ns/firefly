@@ -139,7 +139,7 @@ func (conf *configure) Delay() bool {
 	return conf.opt.Delay >= 0
 }
 func (conf *configure) Timeout() bool {
-	return conf.opt.Timeout >= 0
+	return conf.opt.Timeout < 0
 }
 
 func (conf *configure) ThreadsExtract() bool {
