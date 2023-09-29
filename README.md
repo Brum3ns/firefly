@@ -34,7 +34,12 @@ Firefly is an advanced black-box fuzzer and not just a standard asset discovery 
 ```
 go install -v github.com/Brum3ns/firefly/cmd/firefly@latest
 ```
+or
+```
+go get -v github.com/Brum3ns/firefly/cmd/firefly
+```
 
+<!--
 If the above install method do not work try the following:
 ```
 git clone https://github.com/Brum3ns/firefly.git
@@ -42,6 +47,7 @@ cd firefly/
 go build cmd/firefly/firefly.go
 ./firefly -h
 ```
+-->
 
 
 # Usage
