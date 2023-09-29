@@ -2,9 +2,12 @@ package scan
 
 import (
 	"fmt"
+	"log"
 	"sync"
 
+	"github.com/Brum3ns/firefly/pkg/design"
 	"github.com/Brum3ns/firefly/pkg/firefly/config"
+	"github.com/Brum3ns/firefly/pkg/knowledge"
 	"github.com/Brum3ns/firefly/pkg/output"
 	"github.com/Brum3ns/firefly/pkg/payloads"
 	"github.com/Brum3ns/firefly/pkg/prepare"
@@ -12,7 +15,6 @@ import (
 	"github.com/Brum3ns/firefly/pkg/scan/difference"
 	"github.com/Brum3ns/firefly/pkg/scan/extract"
 	"github.com/Brum3ns/firefly/pkg/scan/transformation"
-	"github.com/Brum3ns/firefly/pkg/verify"
 )
 
 type Engine struct {
@@ -28,22 +30,26 @@ type Engine struct {
 type Properties struct {
 	Threads       int
 	PayloadVerify string
-	//VerifiedStorage map[string][]verify.TargetKnowledge //!Note : (This map *MUST* be static and not modifed)
 
 	//The scanner contains the points to a base structure that contains the base structure
 	//of all the scanner techniques the engine need. This save memory and gain better preformence in the overall preformance.
 	//Note : (Static data stored. Read struct DESC)
 	Scanner *config.Scanner
+
+	//This map holds all the knowledge of all the targets
+	//!Note : (This map *MUST* be static and not modifed)
+	Knowledge map[string]knowledge.Knowledge
 }
 
 // process represents the process that executes the job
 type process struct {
-	PayloadVerify string
-	jobChannel    chan Job
-	pool          chan chan Job
+	jobChannel chan Job
+	pool       chan chan Job
+	Scanner    *config.Scanner //!Note : (Static data stored. Read struct DESC)
+	Result     processResult   //<-Returned
+
 	//Knowledge  map[string][]verify.TargetKnowledge //Note : (Should be a pointer of "Properties.VerifyStorage")
-	Scanner *config.Scanner //!Note : (Static data stored. Read struct DESC)
-	Result  processResult   //<-Returned
+	Knowledge map[string]knowledge.Knowledge
 }
 
 type processResult struct {
@@ -55,7 +61,7 @@ type processResult struct {
 }
 
 type Job struct {
-	Knowledge []verify.TargetKnowledge
+	Knowledge knowledge.Knowledge
 	Http      request.Result
 }
 
@@ -87,7 +93,7 @@ func (e *Engine) Run(listener chan<- Result) {
 
 	//Start the amount of processes related to the amount of given threads:
 	for i := 0; i < e.Threads; i++ {
-		e.Process = newProcess(e.PayloadVerify, e.Scanner, e.Pool)
+		e.Process = newProcess(e.Knowledge, e.Scanner, e.Pool)
 		e.Process.spawnProcess(pResult)
 	}
 
@@ -106,9 +112,6 @@ func (e *Engine) Run(listener chan<- Result) {
 
 				//Listen for result from any process, if a result is recived, then send it to the listener [chan]nel:
 			case r := <-pResult:
-				//Detect unkown/new behavior
-				r.UnkownBehavior = detectBehavior(r)
-
 				listener <- makeResult(r)
 				e.WaitGroup.Done()
 			}
@@ -124,7 +127,7 @@ func (e *Engine) Run(listener chan<- Result) {
 }
 
 // Add new jobs (tasks) to be performed by the engine processes:
-func (e *Engine) AddJob(verifyMode bool, httpResult request.Result, knowledge []verify.TargetKnowledge) {
+func (e *Engine) AddJob(verifyMode bool, httpResult request.Result, knowledge knowledge.Knowledge) {
 	e.WaitGroup.Add(1)
 	e.JobQueue <- Job{
 		Http:      httpResult,
@@ -137,11 +140,11 @@ func (e *Engine) Stop() {
 }
 
 // Create a new process
-func newProcess(payloadVerify string, scanner *config.Scanner, pool chan chan Job) process {
+func newProcess(knowl map[string]knowledge.Knowledge, scanner *config.Scanner, pool chan chan Job) process {
 	return process{
-		PayloadVerify: payloadVerify,
-		pool:          pool,
-		Scanner:       scanner,
+		Knowledge: knowl,
+		pool:      pool,
+		Scanner:   scanner,
 		//Knowledge:  verifiedStorage,
 		jobChannel: make(chan Job),
 	}
@@ -170,7 +173,19 @@ func (p process) start(job Job) processResult {
 		extResult            extract.Result
 		diffResult           difference.Result
 		transformationResult transformation.Result
+
+		//Confirm that we do have knowledge about our current target:
+		targetKnowledge, ok_knowledge = p.Knowledge[job.Http.TargetHashId]
+
+		//Behavior contains the methods that check unknown behavior along with the behavioral status of the current job:
+		behavior = NewBehavior()
 	)
+
+	//Quick basic behavior checks:
+	if ok_knowledge {
+		behavior.status = behavior.QuickDetect(job.Http.Response, targetKnowledge)
+	}
+
 	//Check if we should preform scanner techniques or not:
 	if !p.Scanner.DisablesTechniques {
 
@@ -192,28 +207,58 @@ func (p process) start(job Job) processResult {
 				ext.AddJob(
 					job.Http.Response.Body,
 					job.Http.Response.HeaderString,
-					p.Scanner.Extract.Known,
+					//p.Scanner.Extract.Known,
 				)
 				extResult = ext.Run()
+
+				//In case we do have knowledge of the target.
+				if ok_knowledge {
+					//Extract all the new unique regex and patterns discovered.
+					//Note: Current map result MUST be first. Return the same order of "currentMaps" as the result.
+					currentMaps := []map[string]int{
+						extResult.RegexBody,
+						extResult.RegexHeaders,
+						extResult.PatternBody,
+						extResult.PatternHeaders,
+					}
+					knownMaps := []map[string][]int{
+						targetKnowledge.Combine.Extract.RegexBody,
+						targetKnowledge.Combine.Extract.RegexHeaders,
+						targetKnowledge.Combine.Extract.PatternBody,
+						targetKnowledge.Combine.Extract.PatternHeaders,
+					}
+					ExtractMapDiff, totalhits := extract.GetMultiUnique(currentMaps, knownMaps, job.Http.Payload)
+
+					//This shall not be happening, then it's a bug (critical)
+					if len(ExtractMapDiff) != len(currentMaps) {
+						log.Fatal(design.STATUS.CRITICAL,
+							" The current maps used in the engine - extract process containing the list of maps did not match the diff list. Please report this to the official Firefly Github repository",
+						)
+					}
+					//Note : (The same order as in "compareMaps")
+					extResult = extract.Result{
+						OK:             (totalhits > 0),
+						TotalHits:      totalhits,
+						RegexBody:      ExtractMapDiff[0],
+						RegexHeaders:   ExtractMapDiff[1],
+						PatternBody:    ExtractMapDiff[2],
+						PatternHeaders: ExtractMapDiff[3],
+					}
+				}
 				wg.Done()
 			}()
 		}
 
 		//[Diff]erence process:
-		if p.Scanner.OK_Diff && job.Knowledge != nil {
+		if ok_knowledge && p.Scanner.OK_Diff /* && job.Knowledge != nil */ {
 			wg.Add(1)
 			go func() {
-				for _, storage := range job.Knowledge {
-					if job.Http.Response.Body == storage.Response.Body {
-						wg.Done()
-						return
-					}
-				}
 				//Make a new difference instant and provided the current HTTP response body and headers:
 				diff := difference.NewDifference(
 					difference.Properties{
-						Payload:       job.Http.Payload,
-						PayloadVerify: p.PayloadVerify,
+						Payload:          job.Http.Payload,
+						PayloadVerify:    targetKnowledge.PayloadVerify,
+						CompareHTMLNodes: targetKnowledge.Combine.HTMLNode,
 						ResponseBody: &difference.ResponseBody{
 							Body:     job.Http.Response.Body,
 							HtmlNode: prepare.GetHTMLNode(job.Http.Response.Body),
@@ -224,21 +269,23 @@ func (p process) start(job Job) processResult {
 						},
 					},
 				)
-				//Add all the known storage
-				for _, knownStorage := range job.Knowledge {
-					diff.AppendKnownHTMLNode(knownStorage.HTMLNode)
-					diff.AppendKnownHeaders(knownStorage.Response.Headers)
-				}
 				diffResult = diff.Run()
 				wg.Done()
 			}()
 		}
-
 		//Wait for all the scanners to finish:
 		wg.Wait()
 	}
 
+	//Collect all the result for each scan:
+
+	//Confirm the unexpected behavior
+	if (ok_knowledge && !behavior.status) && (diffResult.OK || extResult.OK || transformationResult.OK) {
+		behavior.status = true
+	}
+
 	return processResult{
+		UnkownBehavior: behavior.status,
 		Http:           job.Http,
 		Extract:        extResult,
 		Difference:     diffResult,
@@ -282,8 +329,8 @@ func makeResult(r processResult) Result {
 				WordCount:     resp.WordCount,
 				LineCount:     resp.LineCount,
 				ContentType:   resp.ContentType,
-				ContentLength: int(resp.ContentLength),
-				HeaderAmount:  len(resp.Header),
+				ContentLength: resp.ContentLength,
+				HeaderAmount:  resp.HeaderAmount,
 				Headers:       resp.Header,
 			},
 			Scanner: output.Scanner{

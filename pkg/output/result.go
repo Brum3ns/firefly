@@ -58,7 +58,7 @@ type Response struct {
 	Body          string      `json:"-"`
 	Title         string      `json:"Title"`
 	Proto         string      `json:"HTTP"`
-	IPAddress     string      `json:"IPAddress"`
+	IPAddress     []string    `json:"IPAddress"`
 	Time          float64     `json:"Response-Time"`
 	Headers       http.Header `json:"Headers"`
 }

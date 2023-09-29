@@ -6,14 +6,15 @@ import (
 )
 
 type Statistic struct {
-	TotalRequests int   `json:"Jobs"` //!Note : (Must be declared all at once. Not one by one)
-	Failed        int   `json:"Failed"`
-	Response      int   `json:"Responses"`
-	Completed     int   `json:"Completed"`
-	Output        int   `json:"OutputCount"`
-	Request       *Data `json:"Request"`
-	Scanner       *Data `json:"Scanner"`
-	Mutex         sync.Mutex
+	TotalRequests      int   `json:"Jobs"` //!Note : (Must be declared all at once. Not one by one)
+	UnexpectedBehavior int   `json:"UnexpectedBehavior"`
+	Failed             int   `json:"Failed"`
+	Response           int   `json:"Responses"`
+	Completed          int   `json:"Completed"`
+	Output             int   `json:"OutputCount"`
+	Request            *Data `json:"Request"`
+	Scanner            *Data `json:"Scanner"`
+	Mutex              sync.Mutex
 }
 type Data struct {
 	Count         int           `json:"Count"`
@@ -66,6 +67,10 @@ func (st *Statistic) countComplete() {
 
 func (st *Statistic) countFail() {
 	st.Failed++
+}
+
+func (st *Statistic) countUnexpectedBehavior() {
+	st.UnexpectedBehavior++
 }
 
 func (st *Statistic) countFilter() {

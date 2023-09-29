@@ -35,8 +35,8 @@ func (d *Display) toScreen() {
 		d.design.ResponseTime(d.Response.Time),
 		//Extract:
 		d.design.IsDiff(d.Scanner.Extract.TotalHits),
-		d.design.IsDiff(len(d.Scanner.Extract.Pattern.Body)),
-		d.design.IsDiff(len(d.Scanner.Extract.Pattern.Headers)),
+		d.design.IsDiff(len(d.Scanner.Extract.PatternBody)),
+		d.design.IsDiff(len(d.Scanner.Extract.PatternHeaders)),
 		//Difference:
 		d.design.IsDiff(d.Scanner.Diff.TagHits),
 		d.design.IsDiff(d.Scanner.Diff.AttributeHits),

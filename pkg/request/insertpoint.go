@@ -23,9 +23,8 @@ func NewInsert(insert *Insert, req *RequestProperties) *RequestProperties {
 }
 
 // Insert the payload based on the insert point (default=FUZZ) from user options to a string
-func (ist *Insert) AddKeyword(source string) string {
-	keyword := random.RandomInsert(ist.keyword)
-	return strings.ReplaceAll(source, keyword, ist.payload)
+func (ist *Insert) AddKeyword(s string) string {
+	return strings.ReplaceAll(random.RandomInsert(s), ist.keyword, ist.payload)
 }
 
 func (ist Insert) setHeaders(sliceArry [][2]string) *http.Header {
@@ -39,8 +38,7 @@ func (ist Insert) setHeaders(sliceArry [][2]string) *http.Header {
 }
 
 func (ist Insert) setURL(s string) string {
-	keyword := random.RandomInsert(ist.keyword)
-	return strings.ReplaceAll(s, keyword, URLNormalize(ist.payload))
+	return strings.ReplaceAll(random.RandomInsert(s), ist.keyword, URLNormalize(ist.payload))
 }
 
 func (ist Insert) setPostBody(s string) string {

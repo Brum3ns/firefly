@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"reflect"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -23,21 +22,22 @@ type Properties struct {
 }
 
 type HTMLNode struct {
-	Tag map[string]int
-	//Text           map[string]int
+	Tag            map[string]int
 	Words          map[string]int
 	Comment        map[string]int
 	Attribute      map[string]int
 	AttributeValue map[string]int
+	//Text           map[string]int
 }
 
+// !Note : (MUST be the same name as the "HTMLNode")
 type HTMLNodeCombine struct {
-	Tag            map[string][]int
-	Text           map[string][]int
-	Words          map[string][]int
-	Comment        map[string][]int
-	Attribute      map[string][]int
-	AttributeValue map[string][]int
+	Tag            map[string][]int `json:"Tag"`
+	Words          map[string][]int `json:"Words"`
+	Comment        map[string][]int `json:"Comment"`
+	Attribute      map[string][]int `json:"Attribute"`
+	AttributeValue map[string][]int `json:"AttributeValue"`
+	//Text           map[string][]int `json:"Text"`
 }
 
 func NewHTMLNode() HTMLNode {
@@ -50,14 +50,14 @@ func NewHTMLNode() HTMLNode {
 	}
 }
 
-func NewHTMLNodeCombine() HTMLNodeCombine {
+func NewCombineHTMLNode() HTMLNodeCombine {
 	return HTMLNodeCombine{
 		Tag:            make(map[string][]int),
-		Text:           make(map[string][]int),
 		Words:          make(map[string][]int),
 		Comment:        make(map[string][]int),
 		Attribute:      make(map[string][]int),
 		AttributeValue: make(map[string][]int),
+		//Text:           make(map[string][]int),
 	}
 }
 
@@ -122,66 +122,8 @@ func GetHTMLNode(body string) HTMLNode {
 	return htmlNode
 }
 
-// Combine a list of HTMLNodes and combine its node into a new structure containing the map for each node and a list of int referring to its number of repetitions.func HTMLNodesCombined(htmlNode HTMLNode) HTMLNodeCombined {
-func GetHTMLNodesCombined(htmlNodes []HTMLNode) HTMLNodeCombine {
-	htmlNodeCombined := NewHTMLNodeCombine()
-	for _, hNode := range htmlNodes {
-		v := reflect.ValueOf(hNode)
-		t := v.Type()
-
-		for i := 0; i < v.NumField(); i++ {
-			for k, v := range v.Field(i).Interface().(map[string]int) {
-				switch t.Field(i).Name {
-				case "Tag":
-					htmlNodeCombined.Tag[k] = appendUniqueInt(htmlNodeCombined.Tag[k], v)
-				case "Text":
-					htmlNodeCombined.Text[k] = appendUniqueInt(htmlNodeCombined.Text[k], v)
-				case "Words":
-					htmlNodeCombined.Words[k] = appendUniqueInt(htmlNodeCombined.Words[k], v)
-				case "Comment":
-					htmlNodeCombined.Comment[k] = appendUniqueInt(htmlNodeCombined.Comment[k], v)
-				case "Attribute":
-					htmlNodeCombined.Attribute[k] = appendUniqueInt(htmlNodeCombined.Attribute[k], v)
-				case "AttributeValue":
-					htmlNodeCombined.AttributeValue[k] = appendUniqueInt(htmlNodeCombined.AttributeValue[k], v)
-				}
-			}
-		}
-	}
-	return htmlNodeCombined
-}
-
-// Combine one HTMLNode with another:
-func CombineHTMLNode(combine HTMLNodeCombine, htmlNodes HTMLNode) HTMLNodeCombine {
-	if reflect.DeepEqual(combine, HTMLNodeCombine{}) {
-		combine = NewHTMLNodeCombine()
-	}
-	v := reflect.ValueOf(htmlNodes)
-	t := v.Type()
-
-	for i := 0; i < v.NumField(); i++ {
-		for k, v := range v.Field(i).Interface().(map[string]int) {
-			switch t.Field(i).Name {
-			case "Tag":
-				combine.Tag[k] = appendUniqueInt(combine.Tag[k], v)
-			case "Text":
-				combine.Text[k] = appendUniqueInt(combine.Text[k], v)
-			case "Words":
-				combine.Words[k] = appendUniqueInt(combine.Words[k], v)
-			case "Comment":
-				combine.Comment[k] = appendUniqueInt(combine.Comment[k], v)
-			case "Attribute":
-				combine.Attribute[k] = appendUniqueInt(combine.Attribute[k], v)
-			case "AttributeValue":
-				combine.AttributeValue[k] = appendUniqueInt(combine.AttributeValue[k], v)
-			}
-		}
-	}
-	return combine
-}
-
 // Append a string to a list Works similar as append but do not append duplicates or empty strings
-func appendUniqueInt(l []int, i int) []int {
+/* func appendUniqueInt(l []int, i int) []int {
 	if len(l) == 0 {
 		return append(l, i)
 	}
@@ -192,3 +134,4 @@ func appendUniqueInt(l []int, i int) []int {
 	}
 	return append(l, i)
 }
+*/

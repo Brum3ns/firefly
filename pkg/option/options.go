@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -211,7 +210,7 @@ func NewOptions() *Options {
 	flag.StringVar(&opt.Proxy, "proxy", "", "Proxy to use, "+exampleValues("http://127.0.0.1:8080"))
 
 	//- [ Verify ] -
-	flag.IntVar(&opt.VerifyAmount, "vf", 3, "Verify the original behavior. The amount of verification request to be sent (Recommended amount: 5-9)")
+	flag.IntVar(&opt.VerifyAmount, "vf", 10, "Verify the original behavior. The amount of verification request to be sent (Recommended amount: 5-9)")
 	flag.StringVar(&opt.VerifyPayload, "vP", "13333337", "Verification payload to be used in the process (should be a simple payload of [a-zA-Z0-9])")
 
 	//- [ Parameters ] -
@@ -526,9 +525,6 @@ func (opt *Options) validateURL(s string) (string, bool) {
 	if s == "" || s == " " || s == "\t" || s == "\n" {
 		return s, false
 	}
-	if _, err := url.Parse(s); err != nil {
-		log.Fatal(err)
-	}
 	return s, true
 }
 
@@ -643,29 +639,4 @@ func commaSplit(s string, sep rune) []string {
 
 func exampleValues(s string) string {
 	return fmt.Sprintf("\033[1;33mEx\033[0m: ( %s )", s)
-}
-
-// TODO - (Fix this mess)
-// Output format (json|plaintext)
-func outputFormat(s1, s2 string) (string, string) {
-	//s1 : opt.OutputJson : json
-	//s2 : opt.Output     : output
-	var (
-		lst = []string{s1, s2}
-		f   string
-	)
-	for i := range lst {
-		if len(lst[i]) > 0 {
-			switch i {
-			case 0:
-				return s1, "json"
-			case 1:
-				return s2, "output"
-
-			default:
-				break
-			}
-		}
-	}
-	return f, ""
 }

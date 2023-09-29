@@ -2,6 +2,7 @@ package extract
 
 import (
 	"bufio"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -20,7 +21,7 @@ type Extract struct {
 	sources   map[string]string                              //(Body|Headers)
 	fn_check  map[string]func(item, stringToTest string) int //Note : (contains the pattern/regex "check" function)
 
-	Known Result //<- Known Patterns/Regex that have been discovered
+	//Known Result //<- Known Patterns/Regex that have been discovered
 }
 
 type Properties struct {
@@ -31,17 +32,24 @@ type Properties struct {
 }
 
 type Result struct {
-	OK        bool
-	TotalHits int
-	Pattern   source
-	Regex     source
+	OK             bool
+	TotalHits      int
+	PatternBody    map[string]int
+	PatternHeaders map[string]int
+	RegexBody      map[string]int
+	RegexHeaders   map[string]int
 }
-type source struct {
-	Body    map[string]int
-	Headers map[string]int
+
+// !Note : (MUST be the same name as the "Result")
+type ResultCombine struct {
+	PatternBody    map[string][]int `json:"PatternBody"`
+	PatternHeaders map[string][]int `json:"PatternHeaders"`
+	RegexBody      map[string][]int `json:"RegexBody"`
+	RegexHeaders   map[string][]int `json:"RegexHeaders"`
 }
 
 type process struct {
+	done      bool
 	ok        bool
 	hits      int
 	typ       string
@@ -66,8 +74,17 @@ func NewExtract(p Properties) Extract {
 	}
 }
 
-func (e *Extract) AddJob(body, headers string, known Result) {
-	e.Known = known
+func NewCombine() ResultCombine {
+	return ResultCombine{
+		PatternBody:    make(map[string][]int),
+		PatternHeaders: make(map[string][]int),
+		RegexBody:      make(map[string][]int),
+		RegexHeaders:   make(map[string][]int),
+	}
+}
+
+func (e *Extract) AddJob(body, headers string) {
+	//e.Known = known
 	e.sources = map[string]string{
 		"body":    body,
 		"headers": headers,
@@ -79,15 +96,11 @@ func (e *Extract) AddJob(body, headers string, known Result) {
 // Return: status, amountTotal, amountType, headersPatterns, bodyPatterns.
 func (e Extract) Run() Result {
 	result := Result{
-		Pattern: source{
-			Body:    make(map[string]int),
-			Headers: make(map[string]int),
-		},
-		Regex: source{
-			Body:    make(map[string]int),
-			Headers: make(map[string]int),
-		},
-		TotalHits: 0,
+		TotalHits:      0,
+		PatternBody:    make(map[string]int),
+		PatternHeaders: make(map[string]int),
+		RegexBody:      make(map[string]int),
+		RegexHeaders:   make(map[string]int),
 	}
 
 	//Check if the sources empty, if so, then end:
@@ -96,55 +109,55 @@ func (e Extract) Run() Result {
 	}
 
 	var (
-		wg       sync.WaitGroup
-		process  = make(chan process)
-		JobQueue = make(chan job)
+		wg             sync.WaitGroup
+		processChannel = make(chan process)
+		JobQueue       = make(chan job)
 	)
 
 	for i := 0; i < e.Threads; i++ {
-		go e.analyze(&wg, JobQueue, process)
+		go e.analyze(&wg, JobQueue, processChannel)
 	}
 
 	go func(wg *sync.WaitGroup) {
 		var mutex sync.Mutex
 		for {
-			r := <-process
+			r := <-processChannel
+
 			if r.ok {
 				result.TotalHits += r.hits
 				if r.typ == "body" {
 					//Check method for body:
 					if r.method == "pattern" {
 						mutex.Lock()
-						result.Pattern.Body[r.foundItem]++
+						result.PatternBody[r.foundItem] = r.hits
 						mutex.Unlock()
 
 					} else if r.method == "regex" {
 						mutex.Lock()
-						result.Regex.Body[r.foundItem]++
+						result.RegexBody[r.foundItem] = r.hits
 						mutex.Unlock()
 					}
 				} else if r.typ == "headers" {
 					//Check method for headers:
 					if r.method == "pattern" {
 						mutex.Lock()
-						result.Pattern.Headers[r.foundItem]++
+						result.PatternHeaders[r.foundItem] = r.hits
 						mutex.Unlock()
 
 					} else if r.method == "regex" {
 						mutex.Lock()
-						result.Regex.Headers[r.foundItem]++
+						result.RegexHeaders[r.foundItem] = r.hits
 						mutex.Unlock()
 					}
 				}
+
+			} else if r.done {
 				wg.Done()
 			}
 		}
 	}(&wg)
 
-	e.appendJobs(JobQueue)
-
-	//Remove known patterns/Regex from the result:
-	//TODO
+	e.appendJobs(&wg, JobQueue)
 
 	//Wait for all processes to end:
 	wg.Wait()
@@ -158,13 +171,14 @@ func (e Extract) Run() Result {
 }
 
 // Give job to the extract process
-func (e *Extract) appendJobs(j chan<- job) {
+func (e *Extract) appendJobs(wg *sync.WaitGroup, j chan<- job) {
 	m := map[string]map[string][]string{
 		"pattern": e.WordlistPattern,
 		"regex":   e.WordlistRegex,
 	}
 	for _, mt := range []string{"pattern", "regex"} {
 		for pfx, wl := range m[mt] { //Note : (Just extracting the map - key/value)
+			wg.Add(1)
 			j <- job{
 				prefix:   pfx,
 				method:   mt,
@@ -174,10 +188,55 @@ func (e *Extract) appendJobs(j chan<- job) {
 	}
 }
 
-// TODO
-// Compare verified known patterns with discovered to only extract the unique regarding to the fuzzed bahvior:
-func (e *Extract) uniqueItem(p process) bool {
-	return true
+// Take the current extracted map result and compare it with a known map result.
+// Return the "current" map and all the unique items with their unique values
+func GetUnique(current map[string]int, known map[string][]int, payload string) (map[string]int, int) {
+	hit := 0
+	for item, ValueCurrent := range current {
+		//If the key exists and they share the same value, delete the key from the "current" map:
+		uniuqe := true
+		if lstValue, ok := known[item]; ok {
+			if len(lstValue) == 1 && ValueCurrent == lstValue[0] {
+				uniuqe = false
+
+			} else {
+				for _, value := range lstValue {
+					if ValueCurrent == value {
+						uniuqe = false
+						break
+					}
+				}
+			}
+		}
+		if uniuqe && !strings.Contains(payload, item) {
+			hit += ValueCurrent
+		}
+		delete(current, item)
+	}
+	return current, hit
+}
+
+// Take a list that contains an array of two maps. The first map in the array is the *current* map and the secound map is a map that contains known items.
+// Compare the two maps in the array for all arrays in the list and delete all known items that was detected inside the *current* map.
+// Return a list of maps in the same order as given that only contains the unique items of the *current map*.
+// !Note : (The order for input is important since it effects the return order of the final list of maps)
+func GetMultiUnique(current []map[string]int, known []map[string][]int, payload string) ([]map[string]int, int) {
+	if len(current) != len(known) {
+		log.Fatal("length was different from \"current\" and \"known\" map list given in extract.")
+	}
+
+	//Extract the full list and take the two maps in each list to compare the differences within them:
+	storageDiff := []map[string]int{} //<-List to store the differences (same order as it was given in)
+	totalHits := 0
+
+	for i := 0; i < len(current); i++ {
+		uniqueItems, hit := GetUnique(current[i], known[i], payload)
+
+		storageDiff = append(storageDiff, uniqueItems)
+		totalHits += hit
+	}
+
+	return storageDiff, totalHits
 }
 
 // Check for pattern inside the response body & headers:
@@ -187,14 +246,12 @@ func (e *Extract) analyze(wg *sync.WaitGroup, jobs <-chan job, result chan<- pro
 		for _, t := range []string{"body", "headers"} {
 			stringToTest := e.sources[t]
 			if strings.Contains(stringToTest, j.prefix) {
-
 				//A new wordlist is in need of being analyzed. Add the wordlist length to the listener:
 				for _, item := range j.wordlist {
 
 					//Calculate how many times the item was within the content source.
 					//Then check if the item is a common (known behavior), if not, then send it to the listener:
 					if hits := e.fn_check[j.method](item, stringToTest); hits > 0 {
-						wg.Add(1)
 						result <- process{
 							ok:        true,
 							typ:       t,
@@ -206,6 +263,7 @@ func (e *Extract) analyze(wg *sync.WaitGroup, jobs <-chan job, result chan<- pro
 				}
 			}
 		}
+		result <- process{done: true}
 	}
 }
 

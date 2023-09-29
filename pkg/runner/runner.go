@@ -10,11 +10,11 @@ import (
 	"github.com/Brum3ns/firefly/pkg/files"
 	"github.com/Brum3ns/firefly/pkg/firefly/config"
 	"github.com/Brum3ns/firefly/pkg/firefly/verbose"
+	"github.com/Brum3ns/firefly/pkg/knowledge"
 	"github.com/Brum3ns/firefly/pkg/output"
 	"github.com/Brum3ns/firefly/pkg/prepare"
 	"github.com/Brum3ns/firefly/pkg/request"
 	"github.com/Brum3ns/firefly/pkg/scan"
-	"github.com/Brum3ns/firefly/pkg/verify"
 )
 
 // The runner should contain the structures needed for all the processes.
@@ -27,24 +27,20 @@ type Runner struct {
 	Design           *design.Design
 	RequestTasks     *request.TaskStorage
 	ClientProperties *request.ClientProperties
-	Knowledge        Knowledge //<-Returned
+
+	StoredKnowledge map[string]knowledge.Knowledge
 }
+
 type skipProcess struct {
 	tag string
 	err error
-}
-
-// The Knowledge structure contains variables that will be modified during the runner process
-// Note : (Runner's return data)
-type Knowledge struct {
-	Storage map[string][]verify.TargetKnowledge //(Original URL|Data of Verified behavior)
 }
 
 // Firefly verify/fuzz runner
 // The runner is the core process for all other child processes. It's preforming the requests and listen for responses from the target.
 // When a response has been collected it's sent to the engine that handle the hardware processes. It do so by spinning up a task for
 // each analyze process (aka: tasks).
-func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnowledge) (map[string][]verify.TargetKnowledge, Statistic, error) {
+func Run(conf *config.Configure, knowledgeStorage map[string]knowledge.Knowledge) (map[string]knowledge.Knowledge, Statistic, error) {
 	runner := &Runner{
 		Count:      0,
 		Conf:       conf,
@@ -67,13 +63,16 @@ func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnow
 			Payloads:        conf.Wordlist.GetAll(),
 		},
 		//Check if we already have verified data stored:
-		Knowledge: Knowledge{
-			Storage: verify.Prepare(knowledgeStorage),
-		},
+		StoredKnowledge: knowledgeStorage,
 	}
 
-	//Pre-Declare the output file and JSON encoder that will be used within the output process: (if set):
+	//Check if we got knowledge of the target if we're about to attack it:
+	if !runner.VerifyMode && runner.StoredKnowledge == nil {
+		log.Fatalf("%s no knowledge was found related to the target(s)", design.STATUS.ERROR)
+	}
+
 	var (
+		learnt           = make(map[string][]knowledge.Learnt) //<-Only used in the verificaion process / target knowledge
 		outputFileWriter = &os.File{}
 		err              error
 	)
@@ -137,10 +136,19 @@ func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnow
 
 				//Collect and store verify data (verification mode):
 				if runner.VerifyMode {
-					runner.AppendKnowledge(&mutex, scanResult)
+					mutex.Lock()
+					learnt[scanResult.Output.TargetHashId] = append(learnt[scanResult.Output.TargetHashId], knowledge.Learnt{
+						Payload:  scanResult.Output.Payload,
+						Extract:  scanResult.Output.Scanner.Extract,
+						HTMLNode: prepare.GetHTMLNode(scanResult.Output.Response.Body),
+						Response: scanResult.Output.Response,
+					})
+					mutex.Unlock()
 
 					//Analyze if the result is an unkown behavior:
-				} else if true {
+				} else if scanResult.UnkownBehavior {
+					stats.countUnexpectedBehavior()
+
 					//Send the result to the output file specified by the user:
 					if runner.OutputOK {
 						err := output.WriteJSON(stats.Output, outputFileWriter, scanResult.Output)
@@ -149,6 +157,7 @@ func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnow
 						}
 						stats.countOutput()
 					}
+
 					//Display the final result to the screen (CLI)
 					if !runner.Conf.NoDisplay {
 						output.DisplayCLI(stats.Completed, runner.Design, scanResult.Output)
@@ -159,7 +168,7 @@ func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnow
 			case s := <-skip:
 				stats.handleSkipped(s)
 				if s.err != nil {
-					runner.verbose(s.err)
+					verbose.Show(fmt.Sprintf("%s", s.err))
 				}
 			}
 		}
@@ -167,12 +176,19 @@ func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnow
 		done <- true
 	}()
 
-	// Prepare a new scanner engine with all the base properties:
-	scanEngine := scan.NewEngine(scan.Properties{
+	//Prepare a new scanner engine with all the base properties:
+	engineProperties := scan.Properties{
 		Scanner:       runner.Conf.Scanner,
 		Threads:       runner.Conf.ThreadsEngine,
 		PayloadVerify: conf.Options.VerifyPayload,
-	})
+	}
+	//Give the collected knowledge from the runner verification proces to the scanner engine:
+	if !runner.VerifyMode {
+		engineProperties.Knowledge = runner.StoredKnowledge
+	}
+
+	scanEngine := scan.NewEngine(engineProperties)
+
 	//Start the scanner in the background:
 	go scanEngine.Run(listenerScanner)
 
@@ -206,9 +222,9 @@ func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnow
 			go func() {
 				//Add job to the scanner engine that runs in the background:
 				if runner.VerifyMode {
-					scanEngine.AddJob(runner.VerifyMode, HttpResult, nil)
+					scanEngine.AddJob(runner.VerifyMode, HttpResult, knowledge.Knowledge{})
 				} else {
-					scanEngine.AddJob(runner.VerifyMode, HttpResult, knowledgeStorage[HttpResult.TargetHashId])
+					scanEngine.AddJob(runner.VerifyMode, HttpResult, knowledge.Knowledge{} /* runner.Knowledge.Storage[HttpResult.TargetHashId] */)
 				}
 			}()
 
@@ -227,32 +243,5 @@ func Run(conf *config.Configure, knowledgeStorage map[string][]verify.TargetKnow
 		}
 	}
 
-	return runner.Knowledge.Storage, *stats, nil
-}
-
-func (r *Runner) verbose(msg any) {
-	if !r.Conf.Verbose {
-		return
-	}
-	icon := r.Design.INFO
-	switch msg.(type) {
-	case error:
-		icon = r.Design.ERROR
-	}
-	fmt.Fprintln(os.Stderr, icon, fmt.Sprintf("%v", msg))
-}
-
-func (r *Runner) AppendKnowledge(mutex *sync.Mutex, rs scan.Result) {
-	verifyStorage := verify.TargetKnowledge{
-		Payload:  rs.Output.Payload,
-		HTMLNode: prepare.GetHTMLNode(rs.Output.Response.Body),
-		Response: rs.Output.Response,
-		//Request:  rs.Output.Request,
-		//Behavior: rs.Output.Behavior,
-		//Scanner:  rs.Output.Scanner,
-	}
-
-	mutex.Lock()
-	r.Knowledge.Storage[rs.Output.TargetHashId] = append(r.Knowledge.Storage[rs.Output.TargetHashId], verifyStorage)
-	mutex.Unlock()
+	return knowledge.GetKnowledge(learnt), *stats, nil
 }

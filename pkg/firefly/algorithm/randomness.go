@@ -1,62 +1,80 @@
 package algorithm
 
-//TODO
-/*
-func Entropy() {
+var vocals = map[rune]int{
+	'a': 0,
+	'e': 0,
+	'i': 0,
+	'o': 0,
+	'u': 0,
+	'A': 1,
+	'E': 1,
+	'I': 1,
+	'O': 1,
+	'U': 1,
+	//The digits 0, 3 and 4 can sometimes refer to as the letters o, e and a:
+	//'0': 1,
+	//'3': 1,
+	//'4': 1,
+}
 
-} */
-
-// Use the 'Shannon entropy' algorithm to detect randomness combined with patterns and whitelist of characters.
-// Return: Entropy value | likely to be random(-1=no, 1=yes, 0=unsure) | checked status(true/false)
-/*func Detect(s string) (float64, int, bool) {
-	if len(s) == 0 {
-		return 0, -1, false
-	}
+// Return a map that contains the charFrequency and true/false if the value is random (*very likely to be random*):
+func IsRandom(s string) (map[rune]int, bool) {
 	var (
-		m      = map[rune]float64{}
-		hm     float64
-		likely = 0
+		hit            = 0
+		consonantInRow = 3
+		charFrequency  = make(map[rune]int)
 	)
 
-		var (
-
-
-			length = len(s)
-			amount = 5
-			InRow  = 0 // (InRow >= 'amount') constant (*or* mixed with digits) in a row is likely to be a random generated string
-		)
-
-		if length >= 8 {
-			amount -= 1
-		} else if length >= 10 {
-			amount -= 2
+	//Calculate constant that comes in a row: (usually 3-4+ result in a random string)
+	for _, r := range s {
+		if _, ok := vocals[r]; ok {
+			hit = 0
 		}
+		hit++
+		//Likely to be random:
+		if hit == consonantInRow {
 
-		for _, rn := range s {
-			if _, ok := global.RANDOMNESS_WHITELIST[rn]; !ok {
-				return 0, 0, false
-			}
-
-			if likely == 0 {
-				_, ok := global.CONSONANTS_DIGITS[rn]
-				switch {
-				case InRow >= amount:
-					likely = 1
-				case ok:
-					InRow++
-				default:
-					InRow = 0
-				}
-			}
-			m[rn]++
+			//Save random values and make an "average entropy value" adapted to the applicato so we can learn the randomness sturcture
+			return charFrequency, true
 		}
-
-	for _, c := range m {
-		hm += (c * math.Log2(c))
+		charFrequency[r]++
 	}
-	l := float64(len(s))
-	entropyValue := math.Log2(l) - hm/l
+	return charFrequency, false
+}
 
-	return entropyValue, likely, true
+//TODO
+/* func DetectRandomness(m map[string]int) (map[string]int, int) {
+	totalHits := 0
+	for s, hits := range m {
+		//Quick randomness check:
+		if _, ok := IsRandom(s); ok {
+			delete(m, s)
+
+			//Math algoritm (*shannon entropy*) to verify:
+		} else {
+			totalHits += hits
+		}
+	}
+	return m, totalHits
+}
+
+func Entropy(s string, charFrequency map[rune]int) float64 {
+	var (
+		value float64
+		runes = []rune(s)
+	)
+	//In case we do not have the char frequency set:
+	if charFrequency == nil {
+		charFrequency = make(map[rune]int)
+		for _, r := range runes {
+			charFrequency[r]++
+		}
+	}
+	characters := float64(len(runes))
+	for _, count := range charFrequency {
+		probability := float64(count) / characters
+		value -= probability * math.Log2(probability)
+	}
+	return value
 }
 */

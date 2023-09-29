@@ -40,12 +40,13 @@ type Response struct {
 	Time            float64
 	WordCount       int
 	LineCount       int
+	HeaderAmount    int
 	ContentLength   int
 	ContentType     string
 	Title           string
-	IPAddress       string
 	Body            string
 	HeaderString    string
+	IPAddress       []string
 	HeadersOriginal [][2]string
 	http.Response
 }
@@ -113,8 +114,6 @@ func (w worker) request(requestProperties RequestProperties) Result {
 		responseTime = float64(time.Since(Timer).Seconds())
 	}
 
-	ipAddress, _ := net.LookupIP(response.Request.URL.Hostname())
-
 	buffer := new(bytes.Buffer)
 	buffer.ReadFrom(httpRequest.Body)
 
@@ -142,16 +141,17 @@ func (w worker) request(requestProperties RequestProperties) Result {
 			Request:         *httpRequest,
 		},
 		Response: Response{
-			IPAddress:     fmt.Sprintf("%v", ipAddress)[1 : len(ipAddress)-1],
+			IPAddress:     GetIPAddresses(response.Request.URL.Hostname()),
 			HeaderString:  headersToStr(response.Header),
 			Title:         GetHTMLTitle(bodyString),
 			ContentType:   response.Header.Get("content-type"),
+			ContentLength: len(bodyString),
+			HeaderAmount:  len(response.Header),
 			Time:          responseTime,
 			LineCount:     functions.LineCount(bodyString),
 			WordCount:     functions.WordCount(bodyString),
 			Body:          bodyString,
 			Response:      *response,
-			ContentLength: len(bodyString),
 		},
 	}
 }
@@ -170,13 +170,13 @@ func URLNormalize(s string) string {
 }
 
 // Client configure with custom parse *timeout*:
-func setClient(option *ClientProperties) *http.Client {
+func setClient(p *ClientProperties) *http.Client {
 	var (
 		proxy   = http.ProxyFromEnvironment
-		timeout = time.Duration(time.Duration(option.Timeout) * time.Second)
+		timeout = time.Duration(time.Duration(p.Timeout) * time.Second)
 	)
-	if len(option.Proxy) > 0 {
-		if p, err := url.Parse(option.Proxy); err == nil {
+	if len(p.Proxy) > 0 {
+		if p, err := url.Parse(p.Proxy); err == nil {
 			proxy = http.ProxyURL(p)
 		}
 	}
@@ -184,11 +184,11 @@ func setClient(option *ClientProperties) *http.Client {
 		CheckRedirect: func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse },
 		Timeout:       timeout,
 		Transport: &http.Transport{
-			ForceAttemptHTTP2:   option.HTTP2,
+			ForceAttemptHTTP2:   p.HTTP2,
 			Proxy:               proxy,
-			MaxIdleConns:        option.MaxIdleConns,
-			MaxIdleConnsPerHost: option.MaxIdleConnsPerHost,
-			MaxConnsPerHost:     option.MaxConnsPerHost,
+			MaxIdleConns:        p.MaxIdleConns,
+			MaxIdleConnsPerHost: p.MaxIdleConnsPerHost,
+			MaxConnsPerHost:     p.MaxConnsPerHost,
 			DialContext: (&net.Dialer{
 				Timeout: timeout,
 			}).DialContext,
@@ -201,6 +201,16 @@ func setClient(option *ClientProperties) *http.Client {
 		},
 	}
 	return client
+}
+
+// Get a list of IP addresses that the hostname resolves to
+func GetIPAddresses(hostname string) []string {
+	var lst []string
+	ips, _ := net.LookupIP(hostname)
+	for _, i := range ips {
+		lst = append(lst, i.String())
+	}
+	return lst
 }
 
 // Setup the post data used within the request (if any)
@@ -222,6 +232,11 @@ func ValidScheme(s string) bool {
 	return s == "http" || s == "https"
 }
 
+func ValidURLOrIP(s string) bool {
+	_, err := url.Parse(s)
+	return err == nil || net.ParseIP(s) != nil
+}
+
 // return a random 'User-Agent' from default/selected wordlist in memory
 func randomUserAgent() string {
 	return randomUserAgents[rand.Intn(len(global.RANDOM_AGENTS)-1)]
@@ -230,6 +245,10 @@ func randomUserAgent() string {
 // Convert the *http.Header* to a string (type: "map[string][]string").
 // The converted string version is sorted which makes it easier to compare with others.
 func headersToStr(headers http.Header) string {
+	if headers == nil {
+		return ""
+	}
+
 	arr := make([]string, 0, len(headers))
 	for k, v := range headers {
 		arr = append(arr, fmt.Sprintf("%s: %s\n", k, strings.Join(v, " ")))
