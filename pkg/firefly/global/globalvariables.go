@@ -5,6 +5,11 @@ import (
 	"os"
 )
 
+// Terminal based variables
+var (
+	TERMINAL_CLEAR = "\r\x1b[2K"
+)
+
 // File directory global variables (Never ever reassign any of these):
 var (
 	//Root directories:

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Brum3ns/firefly/pkg/design"
 	"github.com/Brum3ns/firefly/pkg/firefly/config"
+	"github.com/Brum3ns/firefly/pkg/firefly/global"
 	"github.com/Brum3ns/firefly/pkg/firefly/keypress"
 	"github.com/Brum3ns/firefly/pkg/firefly/precheck"
 	"github.com/Brum3ns/firefly/pkg/option"
@@ -14,7 +15,6 @@ import (
 )
 
 func main() {
-
 	//Check resources before starting (first time use):
 	precheck.Setup()
 
@@ -30,26 +30,29 @@ func main() {
 	timer := time.Now()
 
 	//Run the runner in verifyication process mode to detect normal behavior and patterns within the target:
-	KnowledgeStorage, _, err := runner.Run(conf, nil)
+	VerifyRunner := runner.NewRunner(conf, nil)
+	KnowledgeStorage, _, err := VerifyRunner.Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	//Run the black-box enumiration process:
-	_, Statistic, err := runner.Run(conf, KnowledgeStorage)
+	AttackRunner := runner.NewRunner(conf, KnowledgeStorage)
+	_, Statistic, err := AttackRunner.Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	//Display summary of the process:
 	fmt.Printf(
-		":: Process finished: Requests/Responses:[%d/%d], Completed:[\033[1;32m%d\033[0m], Unexpected Behavior:[\033[1;33m%d\033[0m], Filtered:[\033[1;36m%d\033[0m], Failed:[\033[31m%d\033[0m], Time:[%v]\n",
+		"%s\033[1;32m\u2713\033[0m Process finished: Requests/Responses:[%d/%d], Scanned:[\033[1;32m%d\033[0m], Behavior:[\033[1;33m%d\033[0m], Filtered:[\033[1;36m%d\033[0m], Error:[\033[31m%d\033[0m], Time:[%v]\n",
+		global.TERMINAL_CLEAR,
+		Statistic.Response.Count,
 		Statistic.Request.Count,
-		Statistic.Response,
-		Statistic.Completed,
-		Statistic.UnexpectedBehavior,
+		Statistic.Scanner.Count,
+		Statistic.Behavior,
 		Statistic.Request.Filtered,
-		Statistic.Failed,
+		Statistic.Error,
 		time.Since(timer),
 	)
 }

@@ -1,4 +1,3 @@
-
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -17,6 +16,12 @@
 
 # Go workspace file
 go.work
+
+# Go Debug files
+**/*__debug*
+
+# Visual studio code launch json debug file:
+launch.json
 
 # General
 **/*logs

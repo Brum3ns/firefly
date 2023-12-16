@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Brum3ns/firefly/pkg/design"
+	"github.com/Brum3ns/firefly/pkg/firefly/global"
 )
 
 type Display struct {
@@ -11,19 +12,18 @@ type Display struct {
 	design *design.Design
 }
 
-// DisplayCLI display a given structure (result data) to the command line interface (CLI) [show: on/off]) and any struct that *include JSON supported tags*.
-// The function use color highlighting in the CLI by using a mixture of stderr and stout. The output values will be in stout
-// version which makes it possible to support pipelining without including garbage in the values.
-func DisplayCLI(count int, design *design.Design, r ResultFinal) {
-	display := &Display{
-		ResultFinal: r,
-		design:      design,
+func NewDisplay(design *design.Design) *Display {
+	return &Display{
+		design: design,
 	}
-	display.toScreen()
 }
 
-// Display the information to the screen
-func (d *Display) toScreen() {
+// Display the information to the screen from a given structure (result data) to the command line interface (CLI) [show: on/off]) and any struct that *include JSON supported tags*.
+// The function use color highlighting in the CLI by using a mixture of stderr and stout. The output values will be in stout
+// version which makes it possible to support pipelining without including garbage in the values.
+func (d *Display) ToScreen(result ResultFinal) {
+	d.ResultFinal = result
+
 	stout := fmt.Sprintf("╭ \033[33m%s\033[0m Status:%s, Words:%s, Lines:%s, CL:%s, CT:%s, Time:%sms\n"+
 		"╰╴Errors:[Hits:%s, Body:%s, Header:%s] Diff:[Tag:%s, Attr:%s, AttrValues:%s, Words:%s, Comments:%s]",
 		d.Payload,
@@ -48,7 +48,7 @@ func (d *Display) toScreen() {
 		stout += d.transformation()
 	}
 
-	fmt.Println(stout + "\n")
+	fmt.Println(global.TERMINAL_CLEAR + stout + "\n")
 }
 
 // Display payload transformation:

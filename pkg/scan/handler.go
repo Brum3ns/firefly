@@ -17,22 +17,22 @@ import (
 	"github.com/Brum3ns/firefly/pkg/scan/transformation"
 )
 
-type Engine struct {
+type Handler struct {
 	Process   process
 	WaitGroup sync.WaitGroup
 	JobQueue  chan Job
 	Pool      chan chan Job
 	quit      chan bool
-	Properties
+	Settings
 }
 
-// Properties given by user input to adapt the scanning process
-type Properties struct {
+// Settings given by user input to adapt the scanning process
+type Settings struct {
 	Threads       int
 	PayloadVerify string
 
 	//The scanner contains the points to a base structure that contains the base structure
-	//of all the scanner techniques the engine need. This save memory and gain better preformence in the overall preformance.
+	//of all the scanner techniques the handler need. This save memory and gain better preformence in the overall preformance.
 	//Note : (Static data stored. Read struct DESC)
 	Scanner *config.Scanner
 
@@ -73,17 +73,17 @@ type Result struct {
 }
 
 // Start the handler for the workers by giving the tasks to preform and the amount of workers.
-func NewEngine(properties Properties) *Engine {
-	return &Engine{
-		Properties: properties,
-		JobQueue:   make(chan Job),
-		Pool:       make(chan chan Job, properties.Threads),
+func NewHandler(properties Settings) Handler {
+	return Handler{
+		Settings: properties,
+		JobQueue: make(chan Job),
+		Pool:     make(chan chan Job, properties.Threads),
 	}
 }
 
 // Start all the processes and assign tasks (jobs) to the scanners that are listening. Use the method "Stop()" to stop the scanner.
-// Note : (The scanner engine *MUST* run inside a [go]rutine. It can only stop from the method "Stop()" that do send a stop signal to the engine)
-func (e *Engine) Run(listener chan<- Result) {
+// Note : (The scanner handler *MUST* run inside a [go]rutine. It can only stop from the method "Stop()" that do send a stop signal to the handler)
+func (e *Handler) Run(listener chan<- Result) {
 	var pResult = make(chan processResult)
 
 	//Validate process amount:
@@ -121,13 +121,13 @@ func (e *Engine) Run(listener chan<- Result) {
 	//Listen a stop signal then wait until all background processes are completed:
 	if <-e.quit {
 		e.WaitGroup.Wait()
-		fmt.Println(":: Scanner Engine stopped")
+		fmt.Println(":: Scanner handler stopped")
 		return
 	}
 }
 
-// Add new jobs (tasks) to be performed by the engine processes:
-func (e *Engine) AddJob(verifyMode bool, httpResult request.Result, knowledge knowledge.Knowledge) {
+// Add new jobs (tasks) to be performed by the handler processes:
+func (e *Handler) AddJob(verifyMode bool, httpResult request.Result, knowledge knowledge.Knowledge) {
 	e.WaitGroup.Add(1)
 	e.JobQueue <- Job{
 		Http:      httpResult,
@@ -135,7 +135,7 @@ func (e *Engine) AddJob(verifyMode bool, httpResult request.Result, knowledge kn
 	}
 }
 
-func (e *Engine) Stop() {
+func (e *Handler) Stop() {
 	e.quit <- true
 }
 
@@ -232,7 +232,7 @@ func (p process) start(job Job) processResult {
 					//This shall not be happening, then it's a bug (critical)
 					if len(ExtractMapDiff) != len(currentMaps) {
 						log.Fatal(design.STATUS.CRITICAL,
-							" The current maps used in the engine - extract process containing the list of maps did not match the diff list. Please report this to the official Firefly Github repository",
+							" The current maps used in the handler - extract process containing the list of maps did not match the diff list. Please report this to the official Firefly Github repository",
 						)
 					}
 					//Note : (The same order as in "compareMaps")

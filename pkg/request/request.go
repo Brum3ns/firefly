@@ -2,11 +2,12 @@ package request
 
 import (
 	"bytes"
+	"crypto/md5"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,8 +19,8 @@ import (
 	"github.com/Brum3ns/firefly/pkg/design"
 	"github.com/Brum3ns/firefly/pkg/firefly/global"
 	"github.com/Brum3ns/firefly/pkg/functions"
-	fc "github.com/Brum3ns/firefly/pkg/functions"
 	"github.com/Brum3ns/firefly/pkg/random"
+	"github.com/Brum3ns/firefly/pkg/request/parameter"
 )
 
 var regex_HTMLTitle = regexp.MustCompile(`<title>(.*?)<\/title>`)
@@ -30,7 +31,7 @@ type Result struct {
 	Tag          string
 	Date         string
 	Payload      string
-	Request      Request
+	Request      HttpRequest
 	Response     Response
 	Skip         bool
 	Error        error
@@ -51,29 +52,37 @@ type Response struct {
 	http.Response
 }
 
-// Request configuration (alias of the "http.Request" struct but with some extra variables added)
-type Request struct {
+// HttpRequest configuration (alias of the "http.HttpRequest" struct but with some extra variables added)
+type HttpRequest struct {
 	Body            string
 	URLOriginal     string
 	HeadersOriginal [][2]string
 	http.Request
 }
 
-type RequestProperties struct {
-	RequestId       int
-	RandomUserAgent bool
-	TargetHashId    string
-	Tag             string
-	URL             string
-	URLOriginal     string
-	Payload         string
-	PostBody        string
-	Method          string
-	HeadersOriginal [][2]string
-	Headers         http.Header
+// Request settings for each individuallyrequest
+type RequestSettings struct {
+	RequestId    int
+	TargetHashId string
+	Tag          string
+	URL          string
+	URLOriginal  string
+	Payload      string
+	Method       string
+	Parameter    parameter.Parameter
+	RequestBase
 }
 
-type ClientProperties struct {
+// Stores the base (static) HTTP data that will be used within all requests
+type RequestBase struct {
+	PostBody             string
+	InsertPoint          string
+	RandomUserAgent      bool
+	HeadersOriginalArray [][2]string
+	Headers              http.Header
+}
+
+type ClientSettings struct {
 	Timeout             int
 	MaxIdleConns        int
 	MaxConnsPerHost     int
@@ -82,34 +91,40 @@ type ClientProperties struct {
 	Proxy               string
 }
 
+type Host struct {
+	URL    string
+	Scheme string
+	Method string
+}
+
 var (
 	regexScheme      = regexp.MustCompile(`^*(.*?)*://`)
-	randomUserAgents = fc.FileToList(global.FILE_RANDOMAGENT)
+	randomUserAgents = functions.FileToList(global.FILE_RANDOMAGENT)
 	ruaLength        = len(randomUserAgents)
 )
 
 // Reques module that send and add the response data to the "results" channel and use "Response" as struct for dynamic temp variables:
-func (w worker) request(requestProperties RequestProperties) Result {
-
-	httpRequest, err := http.NewRequest(requestProperties.Method, requestProperties.URL, SetPostbody(requestProperties.PostBody))
+func Request(client *http.Client, requestSettings RequestSettings) Result {
+	httpRequest, err := http.NewRequest(requestSettings.Method, requestSettings.URL, SetPostbody(requestSettings.PostBody))
 	if err != nil {
 		return Result{Error: err}
 	}
 
 	//Add headers:
-	httpRequest.Header = requestProperties.Headers
+	httpRequest.Header = requestSettings.Headers
 
-	if ruaLength > 0 && requestProperties.RandomUserAgent {
-		httpRequest.Header.Add("User-Agent", randomUserAgents[random.Rand.Intn(ruaLength)])
+	//Add random headers (if set):
+	if ruaLength > 0 && requestSettings.RandomUserAgent {
+		httpRequest.Header.Add("User-Agent", getRandomUserAgent())
 	}
 
-	var responseTime float64
 	Timer := time.Now()
-	response, err := w.client.Do(httpRequest)
+	response, err := client.Do(httpRequest)
 	if err != nil {
 		return Result{Error: err}
 	}
 	//The response was successful. Get the response time:
+	var responseTime float64
 	if len(response.Status) > 0 {
 		responseTime = float64(time.Since(Timer).Seconds())
 	}
@@ -129,15 +144,15 @@ func (w worker) request(requestProperties RequestProperties) Result {
 
 	//In case any normalization happens within the request post body it will be spotted for the userlater:
 	return Result{
-		TargetHashId: requestProperties.TargetHashId,
-		RequestId:    requestProperties.RequestId,
-		Tag:          requestProperties.Tag,
-		Payload:      requestProperties.Payload,
+		TargetHashId: requestSettings.TargetHashId,
+		RequestId:    requestSettings.RequestId,
+		Tag:          requestSettings.Tag,
+		Payload:      requestSettings.Payload,
 		Date:         time.Now().Format(time.UnixDate),
 		Error:        nil,
-		Request: Request{
-			URLOriginal:     requestProperties.URLOriginal,
-			HeadersOriginal: requestProperties.HeadersOriginal,
+		Request: HttpRequest{
+			URLOriginal:     requestSettings.URLOriginal,
+			HeadersOriginal: requestSettings.HeadersOriginalArray,
 			Request:         *httpRequest,
 		},
 		Response: Response{
@@ -156,6 +171,7 @@ func (w worker) request(requestProperties RequestProperties) Result {
 	}
 }
 
+// Normalize common characters in the URL into URL-encode:
 func URLNormalize(s string) string {
 	var (
 		l_find        = []string{" ", "\t", "\n", "#", "&", "?"}
@@ -169,8 +185,18 @@ func URLNormalize(s string) string {
 	return s
 }
 
+// Get a list of IP addresses that the hostname resolves to
+func GetIPAddresses(hostname string) []string {
+	var lst []string
+	ips, _ := net.LookupIP(hostname)
+	for _, i := range ips {
+		lst = append(lst, i.String())
+	}
+	return lst
+}
+
 // Client configure with custom parse *timeout*:
-func setClient(p *ClientProperties) *http.Client {
+func NewClient(p ClientSettings) *http.Client {
 	var (
 		proxy   = http.ProxyFromEnvironment
 		timeout = time.Duration(time.Duration(p.Timeout) * time.Second)
@@ -203,16 +229,6 @@ func setClient(p *ClientProperties) *http.Client {
 	return client
 }
 
-// Get a list of IP addresses that the hostname resolves to
-func GetIPAddresses(hostname string) []string {
-	var lst []string
-	ips, _ := net.LookupIP(hostname)
-	for _, i := range ips {
-		lst = append(lst, i.String())
-	}
-	return lst
-}
-
 // Setup the post data used within the request (if any)
 func SetPostbody(body string) *bytes.Buffer {
 	return bytes.NewBuffer([]byte(body))
@@ -238,8 +254,8 @@ func ValidURLOrIP(s string) bool {
 }
 
 // return a random 'User-Agent' from default/selected wordlist in memory
-func randomUserAgent() string {
-	return randomUserAgents[rand.Intn(len(global.RANDOM_AGENTS)-1)]
+func getRandomUserAgent() string {
+	return randomUserAgents[random.Rand.Intn(ruaLength)]
 }
 
 // Convert the *http.Header* to a string (type: "map[string][]string").
@@ -257,6 +273,30 @@ func headersToStr(headers http.Header) string {
 	return strings.Join(arr, "")
 }
 
+// Set a new value for an existing header
+func SetNewHeaderValue(arr [][2]string, header string, value string) [][2]string {
+	header = strings.ToLower(header)
+	for idx, h := range arr {
+		if strings.ToLower(h[0]) == header {
+			arr[idx] = [2]string{h[0], value}
+			break
+		}
+	}
+	return arr
+}
+
+// Get a header and it's value from a header array list ([][2]string)
+// Note : (Requested header name  is in-case sensitive)
+func GetHeader(arr [][2]string, header string) (string, string) {
+	header = strings.ToLower(header)
+	for _, h := range arr {
+		if strings.ToLower(h[0]) == header {
+			return h[0], h[1] //header, value
+		}
+	}
+	return "", ""
+}
+
 // Use regexp to extract the HTML title and return it as a string
 func GetHTMLTitle(s string) string {
 	var title string
@@ -264,4 +304,16 @@ func GetHTMLTitle(s string) string {
 		title = ti[7 : len(ti)-8] //(Known size from re_title)
 	}
 	return title
+}
+
+// Make a unique md5 hash from the url and method:
+func MakeHash(Url, method string) string {
+	hash := md5.Sum([]byte(method + Url))
+	return hex.EncodeToString(hash[:])
+}
+
+// Take a full raw URL and return the raw query
+func GetRawQuery(Url string) (string, error) {
+	u, err := url.Parse(Url)
+	return u.RawQuery, err
 }

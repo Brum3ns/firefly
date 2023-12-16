@@ -1,34 +1,40 @@
 package request
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"net/http"
-	"sync"
 	"time"
 
-	"github.com/Brum3ns/firefly/pkg/payloads"
+	"github.com/Brum3ns/firefly/internal/waitgroup"
 )
 
 type Handler struct {
+	jobAmount   int
+	Worker      worker
+	TaskStorage *TaskStorage
+	WaitGroup   waitgroup.WaitGroup
+
+	stop        chan bool
+	JobReceived chan int
+	JobQueue    chan RequestSettings
+	WorkerPool  chan chan RequestSettings
+	HandlerSettings
+}
+
+// HandlerSettings holds all the settings which will be used within the primary Handler structure
+type HandlerSettings struct {
 	VerifyMode  bool
 	Delay       int
 	Threads     int
-	Worker      worker
 	Client      *http.Client
-	TaskStorage *TaskStorage
-	WaitGroup   sync.WaitGroup
-
-	JobQueue   chan RequestProperties
-	WorkerPool chan chan RequestProperties
+	RequestBase RequestBase
 }
 
 // worker represents the worker that executes the job
 type worker struct {
 	Delay      int
 	client     *http.Client
-	jobChannel chan RequestProperties
-	workerPool chan chan RequestProperties
+	jobChannel chan RequestSettings
+	workerPool chan chan RequestSettings
 }
 
 type TaskStorage struct {
@@ -43,22 +49,23 @@ type TaskStorage struct {
 }
 
 // Start the handler for the workers by giving the tasks to preform and the amount of workers.
-func NewHandler(ClientProperties *ClientProperties, task *TaskStorage, threads int, delay int, verifyMode bool) *Handler {
-	return &Handler{
-		Delay:       delay,
-		VerifyMode:  verifyMode,
-		Threads:     threads,
-		TaskStorage: task,
-		JobQueue:    make(chan RequestProperties),
-		WorkerPool:  make(chan chan RequestProperties, threads),
-		Client:      setClient(ClientProperties),
+func NewHandler(settings HandlerSettings) Handler { // httpclient *http.Client, task *TaskStorage, threads int, delay int, verifyMode bool) *Handler {
+	return Handler{
+		HandlerSettings: settings,
+		stop:            make(chan bool),
+		JobReceived:     make(chan int),
+		JobQueue:        make(chan RequestSettings),
+		WorkerPool:      make(chan chan RequestSettings, settings.Threads),
 	}
 }
 
 // Start all the workers and assign tasks (jobs) to the request workers
-func (h *Handler) Run(listener chan<- Result, RequestAmount chan<- int, done chan<- bool) {
-	//Start the amount of workers related to the amount of given threads:
+// The process will start listen for job and stop once all job sent is done.
+// !Note : (To set the job amount to let the process know when to stop use the method "SetJobAmount")
+func (h *Handler) Run(listener chan<- Result) {
 	var result = make(chan Result)
+
+	//Start the amount of workers related to the amount of given threads:
 	for i := 0; i < h.Threads; i++ {
 		h.Worker = newRequestWorker(h.Client, h.WorkerPool, h.Delay)
 		h.Worker.spawnRequestWorker(result)
@@ -69,7 +76,7 @@ func (h *Handler) Run(listener chan<- Result, RequestAmount chan<- int, done cha
 		for {
 			select {
 			case job := <-h.JobQueue:
-				go func(job RequestProperties) {
+				go func(job RequestSettings) {
 					//Get an available job channel from any worker:
 					jobChannel := <-h.WorkerPool
 
@@ -84,77 +91,40 @@ func (h *Handler) Run(listener chan<- Result, RequestAmount chan<- int, done cha
 			}
 		}
 	}()
-	RequestAmount <- h.appendJobs()
 	//Wait until all workers have provided the result for each job given, then send a signal that the core process is done:
-	h.WaitGroup.Wait()
-
-	//Send a signal back that all tasks where completed
-	done <- true
+	<-h.stop
 }
 
-// Add new jobs (tasks) to be performed in the workgroup
-// Return the amount of job that was given
-func (h *Handler) appendJobs() int {
-	h.WaitGroup.Add(1) //<-Adds the core process to avoid the gorutines finish before all jobs is given
-	var (
-		requestId = 0
-		jobAmount = 0
-	)
-	for _, url := range h.TaskStorage.URLs {
-		for _, method := range h.TaskStorage.Methods {
-			hash := md5.Sum([]byte(method + url))
-			targetHashId := hex.EncodeToString(hash[:])
+// Add a job process to the handler
+func (h *Handler) AddJob(job RequestSettings) {
+	h.WaitGroup.Add(1)
+	h.jobAmount++
+	job.RequestId = h.jobAmount
+	h.JobQueue <- job
+}
 
-			for _, tag := range payloads.TAGS {
-				//Check if we should adapt to "behavior verification mode":
-				if (h.VerifyMode && tag != payloads.TAG_VERIFY) || (!h.VerifyMode && tag == payloads.TAG_VERIFY) {
-					continue
-				}
+// Send a stop signal to the handler
+func (h *Handler) Stop() {
+	h.stop <- true
+}
 
-				wordlist := h.TaskStorage.Payloads[tag]
-				for _, payload := range wordlist {
-					requestId++
-					//Prepare the request by inserting the current payload into the request:
-					//Note : (Some variables given will be modified)
-					req := NewInsert(
-						&Insert{
-							payload: payload,
-							keyword: h.TaskStorage.InsertPoint,
-						},
-						&RequestProperties{
-							TargetHashId:    targetHashId,
-							RequestId:       requestId,
-							Tag:             tag,
-							Payload:         payload,
-							URL:             url,
-							URLOriginal:     url,
-							Method:          method,
-							HeadersOriginal: h.TaskStorage.Headers,
-							PostBody:        h.TaskStorage.PostData,
-							RandomUserAgent: h.TaskStorage.RandomUserAgent,
-						},
-					)
+// Get the amount of active processes that are within the process
+func (h *Handler) GetInProcess() int {
+	return h.WaitGroup.GetCount()
+}
 
-					//Append job to waitgroup
-					h.WaitGroup.Add(1)
-					h.JobQueue <- *req
-					jobAmount++
-				}
-			}
-		}
-	}
-	//Done with the job task process
-	h.WaitGroup.Done()
-	return jobAmount
+// Get the amount of given jobs
+func (h *Handler) GetJobAmount() int {
+	return h.jobAmount
 }
 
 // Create a new request worker
-func newRequestWorker(client *http.Client, workerPool chan chan RequestProperties, delay int) worker {
+func newRequestWorker(client *http.Client, workerPool chan chan RequestSettings, delay int) worker {
 	return worker{
 		Delay:      delay,
 		client:     client,
 		workerPool: workerPool,
-		jobChannel: make(chan RequestProperties),
+		jobChannel: make(chan RequestSettings),
 	}
 }
 
@@ -165,11 +135,9 @@ func (w worker) spawnRequestWorker(result chan Result) {
 			// Add the current worker into the worker queue:
 			w.workerPool <- w.jobChannel
 
-			select {
-			case RequestJob := <-w.jobChannel:
-				time.Sleep(time.Duration(w.Delay) * time.Second)
-				result <- w.request(RequestJob)
-			}
+			RequestJob := <-w.jobChannel
+			time.Sleep(time.Duration(w.Delay) * time.Second)
+			result <- Request(w.client, RequestJob)
 		}
 	}()
 }

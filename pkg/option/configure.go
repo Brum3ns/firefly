@@ -103,9 +103,11 @@ func (conf *configure) MaxIdleConnsPerHost() bool {
 func (conf *configure) MaxConnsPerHost() bool {
 	return conf.opt.MaxConnsPerHost > 0
 }
-func (conf *configure) AutoDetectParams() bool {
-	return len(conf.opt.AutoDetectParams) == 0 || conf.opt.AutoDetectParams == "append" || conf.opt.AutoDetectParams == "replace"
-}
+
+/* func (conf *configure) AutoDetectParams() bool { //Can be ignored ATM
+	return len(conf.opt.AutoParamRules) == 0 || conf.opt.AutoParamRules == "append" || conf.opt.AutoParamRules == "replace"
+} */
+
 func (conf *configure) PayloadReplace() bool {
 	return len(conf.opt.PayloadReplace) == 0 || (len(conf.opt.PayloadReplace) > 0 && strings.Contains(conf.opt.PayloadReplace, " => "))
 }
@@ -126,14 +128,14 @@ func (conf *configure) Scheme() bool {
 func (conf *configure) Methods() bool {
 	return len(conf.opt.Methods) > 0
 }
-func (conf *configure) Engines() bool {
-	return conf.opt.ThreadsEngine > 0
+func (conf *configure) Scanner() bool {
+	return conf.opt.ThreadsScanner > 0
 }
 func (conf *configure) Threads() bool {
 	return conf.opt.Threads > 0
 }
 func (conf *configure) Insert() bool {
-	return len(conf.opt.Insert) > 0
+	return len(conf.opt.InsertKeyword) > 0
 }
 func (conf *configure) Delay() bool {
 	return conf.opt.Delay >= 0
