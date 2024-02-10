@@ -3,12 +3,13 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
 	"time"
 
 	"github.com/Brum3ns/firefly/pkg/design"
 	"github.com/Brum3ns/firefly/pkg/firefly/config"
 	"github.com/Brum3ns/firefly/pkg/firefly/global"
-	"github.com/Brum3ns/firefly/pkg/firefly/keypress"
 	"github.com/Brum3ns/firefly/pkg/firefly/precheck"
 	"github.com/Brum3ns/firefly/pkg/option"
 	"github.com/Brum3ns/firefly/pkg/runner"
@@ -22,10 +23,20 @@ func main() {
 	opt := option.NewOptions()
 	conf := config.NewConfigure(opt)
 
-	design.Disclaimer()
+	if !conf.TerminalUI {
+		design.Banner()
+		design.Disclaimer()
+	}
 
-	//Listen for user keypress input:
-	keypress.CTRL_C()
+	//Listen for user keypress (CTRL + C):
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for range c {
+			fmt.Println("\n\r"+design.STATUS.WARNING, "CTRL+C pressed - Exiting")
+			os.Exit(130)
+		}
+	}()
 
 	timer := time.Now()
 
@@ -42,6 +53,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	os.Exit(1)
 
 	//Display summary of the process:
 	fmt.Printf(
