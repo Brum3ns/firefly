@@ -3,13 +3,14 @@ package difference
 import (
 	"net/http"
 
-	"github.com/Brum3ns/firefly/pkg/firefly/algorithm"
+	"github.com/Brum3ns/firefly/pkg/algorithm"
 	"github.com/Brum3ns/firefly/pkg/prepare"
 )
 
 type Difference struct {
 	*Properties
 }
+
 type Properties struct {
 	Payload       string
 	PayloadVerify string

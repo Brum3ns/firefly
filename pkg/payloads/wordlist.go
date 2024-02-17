@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/Brum3ns/firefly/pkg/firefly/encode"
+	"github.com/Brum3ns/firefly/pkg/encode"
 )
 
 // Wordlist global tag names:
