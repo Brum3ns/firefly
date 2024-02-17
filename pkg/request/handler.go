@@ -68,7 +68,7 @@ func (h *Handler) Run(listener chan<- Result) {
 	//Start the amount of workers related to the amount of given threads:
 	for i := 0; i < h.Threads; i++ {
 		h.Worker = newRequestWorker(h.Client, h.WorkerPool, h.Delay)
-		h.Worker.spawnRequestWorker(result)
+		go h.Worker.spawnRequestWorker(result)
 	}
 
 	//Listen for new jobs from the queue and send it to the job channel for the workers to handle it:
@@ -130,14 +130,12 @@ func newRequestWorker(client *http.Client, workerPool chan chan RequestSettings,
 
 // start the request worker
 func (w worker) spawnRequestWorker(result chan Result) {
-	go func() {
-		for {
-			// Add the current worker into the worker queue:
-			w.workerPool <- w.jobChannel
+	for {
+		// Add the current worker into the worker queue:
+		w.workerPool <- w.jobChannel
 
-			RequestJob := <-w.jobChannel
-			time.Sleep(time.Duration(w.Delay) * time.Second)
-			result <- Request(w.client, RequestJob)
-		}
-	}()
+		RequestJob := <-w.jobChannel
+		time.Sleep(time.Duration(w.Delay) * time.Millisecond)
+		result <- Request(w.client, RequestJob)
+	}
 }
