@@ -53,17 +53,9 @@ func GetKnowledge(learnt map[string][]Learnt) map[string]Knowledge {
 
 			k.Combine.Extract = combineAppendMaps(reflect.ValueOf(&c.Extract), d.Extract).(extract.ResultCombine)
 			k.Combine.HTMLNode = combineAppendMaps(reflect.ValueOf(&c.HTMLNode), d.HTMLNode).(prepare.HTMLNodeCombine)
-
-			//k.HTMLNodeCombine = prepare.CombineHTMLNode(k.HTMLNodeCombine, d.HTMLNode)
-			//k = combineAppend(d.HTMLNode)
-
-			//k.Scanners = append(k.Scanners, d.Scanner)
-
 		}
-
 		storedKnowledge[hashId] = k
 	}
-
 	return storedKnowledge
 }
 
