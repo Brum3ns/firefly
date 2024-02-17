@@ -16,8 +16,8 @@ var (
 	encodeTo = map[string]func(string) string{
 		"surl":   func(s string) string { return Url(s) },
 		"sdurl":  func(s string) string { return DoubleUrl(s) },
-		"url":    func(s string) string { return Url_smart(s) },
-		"durl":   func(s string) string { return DoubleUrl_smart(s) },
+		"url":    func(s string) string { return UrlEsacpe(s) },
+		"durl":   func(s string) string { return UrlDoubleEscape(s) },
 		"base64": func(s string) string { return Base64(s) },
 		"base32": func(s string) string { return Base32(s) },
 		"html":   func(s string) string { return HTMLEsacpe(s) },
@@ -51,11 +51,12 @@ func DoubleUrl(s string) string {
 	return strings.ReplaceAll(Url(s), "%", "%25")
 }
 
-func Url_smart(s string) string {
+// Alias of : url.QueryEscape()
+func UrlEsacpe(s string) string {
 	return url.QueryEscape(s)
 }
 
-func DoubleUrl_smart(s string) string {
+func UrlDoubleEscape(s string) string {
 	return strings.ReplaceAll(url.QueryEscape(s), "%", "%25")
 }
 
