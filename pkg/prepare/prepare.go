@@ -121,17 +121,3 @@ func GetHTMLNode(body string) HTMLNode {
 	}
 	return htmlNode
 }
-
-// Append a string to a list Works similar as append but do not append duplicates or empty strings
-/* func appendUniqueInt(l []int, i int) []int {
-	if len(l) == 0 {
-		return append(l, i)
-	}
-	for _, item := range l {
-		if item == i {
-			return l
-		}
-	}
-	return append(l, i)
-}
-*/
