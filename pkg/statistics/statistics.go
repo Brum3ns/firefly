@@ -84,7 +84,7 @@ func (st *Statistic) CountScanner() {
 }
 
 // Return the time on how long the process has been running
-func (st *Statistic) getTime() [3]time.Duration {
+func (st *Statistic) GetTime() [3]time.Duration {
 	t := time.Since(st.Timer)
 	h := t / time.Hour
 	t -= h * time.Hour
