@@ -29,7 +29,7 @@ func NewProgressBar(delayMS int, statistic *Statistic) ProgressBar {
 
 // Display the progress the statistic structure
 func (p *ProgressBar) Print() {
-	duration := durationFormat(time.Since(p.Stats.Timer))
+	t := p.Stats.getTime()
 
 	if time.Now().After(p.time) {
 		p.Counter++
@@ -49,17 +49,7 @@ func (p *ProgressBar) Print() {
 		p.Stats.Behavior,
 		p.Stats.Request.Filtered,
 		p.Stats.Error,
-		duration[0], duration[1], duration[2],
+		t[0], t[1], t[2],
 	)
 
-}
-
-// Take "time.Duration" value and return list of containing the hour, minute and secounds
-func durationFormat(d time.Duration) [3]time.Duration {
-	h := d / time.Hour
-	d -= h * time.Hour
-	m := d / time.Minute
-	d -= m * time.Minute
-	s := d / time.Second
-	return [3]time.Duration{h, m, s}
 }

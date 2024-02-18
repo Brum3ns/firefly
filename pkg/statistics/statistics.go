@@ -2,25 +2,22 @@
 package statistics
 
 import (
-	"sync"
 	"time"
 )
 
 type Statistic struct {
-	TotalRequests int   `json:"Jobs"` //!Note : (Must be declared all at once. Not one by one)
-	Behavior      int   `json:"UnexpectedBehavior"`
-	Error         int   `json:"Failed"`
-	Completed     int   `json:"Completed"`
-	Output        int   `json:"OutputCount"`
-	Response      *Data `json:"Responses"`
-	Request       *Data `json:"Request"`
-	Scanner       *Data `json:"Scanner"`
-	mutex         sync.Mutex
+	TotalRequests int  `json:"Jobs"` //!Note : (Must be declared all at once. Not one by one)
+	Behavior      int  `json:"UnexpectedBehavior"`
+	Error         int  `json:"Failed"`
+	Completed     int  `json:"Completed"`
+	Output        int  `json:"OutputCount"`
+	Response      Data `json:"Responses"`
+	Request       Data `json:"Request"`
+	Scanner       Data `json:"Scanner"`
 	Timer         time.Time
 }
 
 type Data struct {
-	Name          string
 	Count         int           `json:"Count"`
 	Error         int           `json:"Error"`
 	Filtered      int           `json:"Filtered"`
@@ -33,22 +30,9 @@ type Skip struct {
 }
 
 func NewStatistic(verify bool) Statistic {
-	stats := Statistic{
-		Request: &Data{
-			Name:          "request",
-			ErrorMessages: make(map[error]int),
-		},
-		Response: &Data{
-			Name:          "response",
-			ErrorMessages: make(map[error]int),
-		},
-		Scanner: &Data{
-			Name:          "scanner",
-			ErrorMessages: make(map[error]int),
-		},
+	return Statistic{
 		Timer: time.Now(),
 	}
-	return stats
 }
 
 // Return the current status and a true boolean if it still have processes to handle, otherwise false.
@@ -99,12 +83,13 @@ func (st *Statistic) CountScanner() {
 	st.Scanner.Count++
 }
 
-// Add a new scanner error to the runner statistics instant
-func (st *Statistic) AddScannerError(err error) {
-	if err != nil {
-		st.mutex.Lock()
-		st.Scanner.ErrorMessages[err]++
-		st.mutex.Unlock()
-		st.Scanner.Error++
-	}
+// Return the time on how long the process has been running
+func (st *Statistic) getTime() [3]time.Duration {
+	t := time.Since(st.Timer)
+	h := t / time.Hour
+	t -= h * time.Hour
+	m := t / time.Minute
+	t -= m * time.Minute
+	s := t / time.Second
+	return [3]time.Duration{h, m, s}
 }
