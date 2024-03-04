@@ -213,9 +213,9 @@ func (d *Design) ContentLength(contentLength int) string {
 func (d *Design) ResponseTime(time float64) string {
 	//Check recived *response time* and add color to it if it's odd from the original responses:
 	if time > 7 {
-		return fmt.Sprintf("\033[31m%.4f\033[0m", time)
+		return fmt.Sprintf("\033[31m%.3f\033[0m", time)
 	}
-	return fmt.Sprintf("\033[1:38m%.4f\033[0m", time)
+	return fmt.Sprintf("\033[1:38m%.3f\033[0m", time)
 }
 
 // Colorize the Content Length and return it as a string
