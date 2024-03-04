@@ -69,7 +69,7 @@ func (opt *Options) customUsage() {
 	for _, k := range lst_groupOrder {
 		fmt.Printf("%s:\n%s\n", strings.ToUpper(k), menu[k])
 	}
-	exampleUsage()
+	//exampleUsage() //TODO - Update examples
 }
 
 func colorDefaultValue(s string) string {
