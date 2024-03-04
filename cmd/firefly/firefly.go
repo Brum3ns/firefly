@@ -59,12 +59,12 @@ func main() {
 	fmt.Printf(
 		"%s\033[1;32m\u2713\033[0m Process finished: Requests/Responses:[%d/%d], Scanned:[\033[1;32m%d\033[0m], Behavior:[\033[1;33m%d\033[0m], Filtered:[\033[1;36m%d\033[0m], Error:[\033[31m%d\033[0m], Time:[%v]\n",
 		global.TERMINAL_CLEAR,
-		Statistic.Response.Count,
-		Statistic.Request.Count,
-		Statistic.Scanner.Count,
-		Statistic.Behavior,
-		Statistic.Request.Filtered,
-		Statistic.Error,
+		Statistic.Request.GetCount(),
+		Statistic.Response.GetCount(),
+		Statistic.Scanner.GetCount(),
+		Statistic.Behavior.GetCount(),
+		Statistic.Request.GetFilterCount(),
+		Statistic.Request.GetErrorCount(),
 		time.Since(timer),
 	)
 }
