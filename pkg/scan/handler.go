@@ -67,9 +67,8 @@ type Job struct {
 
 // Note : (Alias of structure "output.ResultFinal")
 type Result struct {
-	Output         output.ResultFinal
-	Error          error
-	UnkownBehavior bool
+	Output output.ResultFinal
+	Error  error
 }
 
 // Start the handler for the workers by giving the tasks to preform and the amount of workers.
@@ -294,19 +293,19 @@ func (p process) start(job Job) processResult {
 }
 
 // Start the extract scanning process
-func makeResult(r processResult) Result {
-	req := r.Http.Request
-	resp := r.Http.Response
+func makeResult(pResult processResult) Result {
+	req := pResult.Http.Request
+	resp := pResult.Http.Response
 
 	return Result{
-		UnkownBehavior: r.UnkownBehavior,
 		Output: output.ResultFinal{
-			TargetHashId: r.Http.TargetHashId,
-			RequestId:    r.Http.RequestId,
-			Tag:          r.Http.Tag,
-			Date:         r.Http.Date,
-			Payload:      r.Http.Payload,
-			OK:           true,
+			TargetHashId:   pResult.Http.TargetHashId,
+			RequestId:      pResult.Http.RequestId,
+			Tag:            pResult.Http.Tag,
+			Date:           pResult.Http.Date,
+			Payload:        pResult.Http.Payload,
+			UnkownBehavior: pResult.UnkownBehavior,
+			OK:             true,
 
 			Request: output.Request{
 				URL:         req.RequestURI,
@@ -334,9 +333,9 @@ func makeResult(r processResult) Result {
 				Headers:       resp.Header,
 			},
 			Scanner: output.Scanner{
-				Extract:        r.Extract,
-				Diff:           r.Difference,
-				Transformation: r.Transformation,
+				Extract:        pResult.Extract,
+				Diff:           pResult.Difference,
+				Transformation: pResult.Transformation,
 				//Data...
 			},
 
