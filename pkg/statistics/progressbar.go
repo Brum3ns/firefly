@@ -29,7 +29,7 @@ func NewProgressBar(delayMS int, statistic *Statistic) ProgressBar {
 
 // Display the progress the statistic structure
 func (p *ProgressBar) Print() {
-	t := p.Stats.getTime()
+	t := p.Stats.GetTime()
 
 	if time.Now().After(p.time) {
 		p.Counter++
@@ -44,12 +44,11 @@ func (p *ProgressBar) Print() {
 	fmt.Fprintf(os.Stderr, "%s%s Request:[%d], Scanned:[%d], Behavior:[%d], Filtered:[%d], Error:[%d], Time:[%d:%02d:%02d]",
 		global.TERMINAL_CLEAR,
 		p.Classic[p.Counter],
-		p.Stats.Request.Count,
-		p.Stats.Scanner.Count,
-		p.Stats.Behavior,
-		p.Stats.Request.Filtered,
-		p.Stats.Error,
+		p.Stats.Request.GetCount(),
+		p.Stats.Scanner.GetCount(),
+		p.Stats.Behavior.GetCount(),
+		p.Stats.Response.GetFilterCount(),
+		p.Stats.Request.GetErrorCount(),
 		t[0], t[1], t[2],
 	)
-
 }
