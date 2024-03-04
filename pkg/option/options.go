@@ -88,8 +88,8 @@ type Display struct {
 	NoDisplay   bool `flag:"no-display" errorcode:"5002"`
 	Listtampers bool `flag:"list-tampers" errorcode:"5003"`
 	ShowConfig  bool `flag:"show-config" errorcode:"5004"`
+	TerminalUI  bool `flag:"tui" errorcode:"5005"`
 	Verbose     bool `flag:"v" errorcode:"5006"`
-	//ShowExamples bool `flag:"show-examples" errorcode:1000`
 }
 
 // ////////////// Payload //////////////// //
@@ -179,7 +179,6 @@ func NewOptions() *Options {
 		"s": 8,
 		"n": 8,
 	}
-	design.Banner()
 
 	//TODO
 	//flag.BoolVar(&opt.Color, "c", false, "Add colors to the screen output")
@@ -261,6 +260,7 @@ func NewOptions() *Options {
 	flag.IntVar(&opt.MaxConnsPerHost, "conn-host", 500, "Limits the total number of connections per host")
 
 	//- [ Display ] -
+	flag.BoolVar(&opt.TerminalUI, "tui", false, "Use advanced terminal user interface (UI)")
 	flag.BoolVar(&opt.NoDisplay, "no-display", false, "Do not display result to screen")
 	flag.BoolVar(&opt.ShowConfig, "show-config", false, "Display all configured parses and their values before the process starts")
 
