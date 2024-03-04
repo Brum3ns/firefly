@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Brum3ns/firefly/internal/waitgroup"
 	"github.com/Brum3ns/firefly/pkg/design"
 	"github.com/Brum3ns/firefly/pkg/files"
 	"github.com/Brum3ns/firefly/pkg/firefly/config"
-	"github.com/Brum3ns/firefly/pkg/firefly/verbose"
 	"github.com/Brum3ns/firefly/pkg/knowledge"
 	"github.com/Brum3ns/firefly/pkg/output"
 	"github.com/Brum3ns/firefly/pkg/payloads"
@@ -19,18 +19,21 @@ import (
 	"github.com/Brum3ns/firefly/pkg/request"
 	"github.com/Brum3ns/firefly/pkg/scan"
 	"github.com/Brum3ns/firefly/pkg/statistics"
+	"github.com/Brum3ns/firefly/pkg/ui"
+	"github.com/Brum3ns/firefly/pkg/verbose"
 )
 
 // The runner should contain the structures needed for all the processes.
 // It must NOT contain structures that need to be modified and/or dynamicly changed once the process is running.
 type Runner struct {
 	Count           int
-	VerifyMode      bool
 	OutputOK        bool
+	VerifyMode      bool
+	TerminalUIMode  bool
 	Conf            *config.Configure
 	Design          *design.Design
 	RequestTasks    *request.TaskStorage
-	statistic       statistics.Statistic
+	stats           statistics.Statistic
 	channel         Channel
 	handler         Handler
 	StoredKnowledge map[string]knowledge.Knowledge
@@ -42,11 +45,10 @@ type Handler struct {
 }
 
 type Channel struct {
-	Skip            chan statistics.Skip
 	ListenerScanner chan scan.Result
 	ListenerHTTP    chan request.Result
-	ResultScanner   chan scan.Result
-	ResultHTTP      chan request.Result
+	Result          chan output.ResultFinal
+	Statistic       chan bool
 }
 
 // Setup a new runner. The runner can run in a verification mode, in that case the argument "knowledgeStorage" MUST be set to "nil".
@@ -54,18 +56,18 @@ type Channel struct {
 func NewRunner(conf *config.Configure, knowledgeStorage map[string]knowledge.Knowledge) *Runner {
 	var verifyMode = (knowledgeStorage == nil)
 	return &Runner{
-		Count:      0,
-		Conf:       conf,
-		VerifyMode: verifyMode,
-		OutputOK:   (len(conf.Output) > 0 && knowledgeStorage != nil),
-		Design:     design.NewDesign(),
-		statistic:  statistics.NewStatistic(verifyMode),
+		Count:          0,
+		Conf:           conf,
+		VerifyMode:     verifyMode,
+		TerminalUIMode: (!verifyMode && conf.TerminalUI),
+		OutputOK:       (len(conf.Output) > 0 && knowledgeStorage != nil),
+		Design:         design.NewDesign(),
+		stats:          statistics.NewStatistic(verifyMode),
 		channel: Channel{
-			Skip:            make(chan statistics.Skip),
 			ListenerScanner: make(chan scan.Result),
 			ListenerHTTP:    make(chan request.Result),
-			ResultScanner:   make(chan scan.Result),
-			ResultHTTP:      make(chan request.Result),
+			Result:          make(chan output.ResultFinal),
+			Statistic:       make(chan bool),
 		},
 		handler: Handler{
 			// Setup the HTTP handler:
@@ -105,111 +107,145 @@ func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, er
 		outputFileWriter = r.MustValidateOutput()
 		learnt           = make(map[string][]knowledge.Learnt)
 		display          = output.NewDisplay(r.Design)
+		terminalUI       = ui.NewProgram()
+		wg               waitgroup.WaitGroup
 	)
 
-	// Start the request handler and send requests to the target:
-	go r.handler.HTTP.Run(r.channel.ListenerHTTP)
+	// Start terminal UI
+	if r.TerminalUIMode {
+		wg.Add(1)
+		go func() {
+			if _, err := terminalUI.Run(); err != nil {
+				log.Fatalf("terminal UI - %s", err)
+			}
+			wg.Done()
+		}()
+	}
 
-	// Start the scanner in the background:
+	// Start the request and scanner handlers
+	go r.handler.HTTP.Run(r.channel.ListenerHTTP)
 	go r.handler.Scanner.Run(r.channel.ListenerScanner)
 
-	// [Handler - Scanner]
-	// Listen for results from the HTTP handler and preform a scan for each intercepted HTTP result:
+	//Runner listener
 	go func() {
 		var (
+			progressBar = statistics.NewProgressBar(100, &r.stats)
 			mutex       sync.Mutex
-			progressBar = statistics.NewProgressBar(101, &r.statistic)
 		)
-
 		for {
-			scanResult := <-r.channel.ListenerScanner
-			if scanResult.Error != nil {
-				verbose.Show(scanResult.Error)
-				r.statistic.AddScannerError(scanResult.Error)
-				continue
-			}
-			r.statistic.CountScanner()
+			select {
+			case <-r.channel.Statistic:
+				if !r.Conf.NoDisplay && r.TerminalUIMode {
+					terminalUI.Send(r.stats)
+				}
 
-			//Collect and store verify data (verification mode):
-			if r.VerifyMode {
-				mutex.Lock()
-				learnt[scanResult.Output.TargetHashId] = append(learnt[scanResult.Output.TargetHashId], knowledge.Learnt{
-					Payload:  scanResult.Output.Payload,
-					Extract:  scanResult.Output.Scanner.Extract,
-					HTMLNode: prepare.GetHTMLNode(scanResult.Output.Response.Body),
-					Response: scanResult.Output.Response,
-				})
-				mutex.Unlock()
+			case result := <-r.channel.Result:
+				r.stats.Count()
 
-				//Analyze if the result is an unkown behavior:
-			} else if scanResult.UnkownBehavior {
-				r.statistic.CountBehavior()
+				if r.VerifyMode {
+					mutex.Lock()
+					learnt[result.TargetHashId] = append(learnt[result.TargetHashId], knowledge.Learnt{
+						Payload:  result.Payload,
+						Extract:  result.Scanner.Extract,
+						HTMLNode: prepare.GetHTMLNode(result.Response.Body),
+						Response: result.Response,
+					})
+					mutex.Unlock()
+				} else if result.UnkownBehavior {
+					r.stats.Behavior.Count()
 
-				//Send the result to the output file specified by the user:
-				if r.OutputOK {
-					err := output.WriteJSON(r.statistic.Output, outputFileWriter, scanResult.Output)
-					if err != nil {
-						log.Println(design.STATUS.ERROR, "Request ID:", scanResult.Output.RequestId, err)
+					// Send the result to the output file specified by the user:
+					if r.OutputOK {
+						err := output.WriteJSON(r.stats.Output.GetCount(), outputFileWriter, result)
+						if err != nil {
+							log.Println(design.STATUS.ERROR, "Request ID:", result.RequestId, err)
+						}
+						r.stats.Output.Count()
 					}
-					r.statistic.CountOutput()
-				}
 
-				//Display the final result to the screen (CLI)
-				if !r.Conf.NoDisplay {
-					display.ToScreen(scanResult.Output)
+					// Display the final result to the screen (CLI)
+					if !r.Conf.NoDisplay {
+						if r.TerminalUIMode {
+							terminalUI.Send(r.stats)
+							terminalUI.Send(result)
+						} else {
+							display.ToScreen(result, r.Conf.TerminalUI)
+							progressBar.Print()
+						}
+					}
 				}
 			}
-			r.statistic.CountComplete()
-
-			progressBar.Print()
 		}
 	}()
 
-	// [Handler - HTTP]
-	// Intercept HTTP request/response results from the request handler and add the response as a job to the scanner handler:
-	go func() {
-		var storedKnowledge = knowledge.Knowledge{}
-		for {
-			resultHTTP := <-r.channel.ListenerHTTP
-			r.statistic.CountRequest()
+	//Listeners
+	go r.listenerScanner()
+	go r.listenerHTTP()
 
-			//Check if we got a valid HTTP response from our requested target or if any error appeared:
-			if resultHTTP.Error != nil {
-				r.statistic.CountError()
-				verbose.Show(resultHTTP.Error)
-				continue
-			}
-
-			r.statistic.CountResponse()
-
-			//Filter the HTTP response (if set):
-			if r.Conf.Filter.Run(resultHTTP.Response) {
-				r.statistic.CountFilter()
-				continue
-			}
-
-			//Give the scanner handler job related to the Http result (request/response):
-			go func() {
-				if !r.VerifyMode {
-					storedKnowledge = r.StoredKnowledge[resultHTTP.TargetHashId]
-				}
-				r.handler.Scanner.AddJob(r.VerifyMode, resultHTTP, storedKnowledge)
-			}()
-		}
-	}()
-
-	// Give all the request job to the HTTP handler and wait until the handlers are completed with all the jobs:
+	// Give all the request jobs to the HTTP handler and wait until the handlers are completed with all the jobs:
 	jobHandlerAmount := r.jobToHandler(&r.handler.HTTP)
 	r.waitForHandlers(jobHandlerAmount)
 
-	//Close the output file (if any output have been handled):
+	// Close the output file (if any output have been handled):
 	if r.OutputOK {
 		if err := outputFileWriter.Close(); err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	return knowledge.GetKnowledge(learnt), r.statistic, nil
+	if r.TerminalUIMode {
+		terminalUI.Quit()
+		wg.Wait()
+	}
+
+	return knowledge.GetKnowledge(learnt), r.stats, nil
+}
+
+// Listen for results from the HTTP handler and preform a scan for each intercepted HTTP result:
+func (r *Runner) listenerScanner() {
+	for {
+		scanResult := <-r.channel.ListenerScanner
+		if scanResult.Error != nil {
+			verbose.Show(scanResult.Error)
+		} else {
+			r.stats.Scanner.Count()
+			r.channel.Result <- scanResult.Output
+		}
+	}
+}
+
+// Listen for HTTP request/response results from the request handler and add the response as a job to the scanner handler:
+func (r *Runner) listenerHTTP() {
+	var storedKnowledge = knowledge.Knowledge{}
+	for {
+		resultHTTP := <-r.channel.ListenerHTTP
+		r.stats.Request.Count()
+
+		//Check if we got a valid HTTP response from our requested target or if any error appeared:
+		if resultHTTP.Error != nil {
+			r.stats.Response.CountError()
+			r.channel.Statistic <- true
+			verbose.Show(resultHTTP.Error)
+			continue
+		}
+		r.stats.Response.Count()
+		r.stats.Response.UpdateTime(resultHTTP.Response.Time)
+
+		//Filter the HTTP response (if set):
+		if r.Conf.Filter.Run(resultHTTP.Response) {
+			r.stats.Response.CountFilter()
+			r.channel.Statistic <- true
+			continue
+		}
+
+		//Give the scanner handler job related to the Http result (request/response):
+		go func() {
+			if !r.VerifyMode {
+				storedKnowledge = r.StoredKnowledge[resultHTTP.TargetHashId]
+			}
+			r.handler.Scanner.AddJob(r.VerifyMode, resultHTTP, storedKnowledge)
+		}()
+	}
 }
 
 // Validate and verify the output to store the result to (if set):
@@ -305,7 +341,7 @@ func (r *Runner) jobToHandler(requestHandler *request.Handler) int {
 
 func (r *Runner) waitForHandlers(jobHandlerAmount int) {
 	for {
-		time.Sleep(30 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		if jobHandlerAmount > 0 && jobHandlerAmount == r.handler.HTTP.GetJobAmount() && r.handler.HTTP.GetInProcess() == 0 {
 			break
 		}
