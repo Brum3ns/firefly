@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,11 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Brum3ns/firefly/pkg/design"
-	"github.com/Brum3ns/firefly/pkg/firefly/global"
-	"github.com/Brum3ns/firefly/pkg/functions"
-	"github.com/Brum3ns/firefly/pkg/random"
-	"github.com/Brum3ns/firefly/pkg/request/parameter"
+	"github.com/Brum3ns/firefly/pkg/parameter"
 )
 
 var regex_HTMLTitle = regexp.MustCompile(`<title>(.*?)<\/title>`)
@@ -69,6 +66,7 @@ type RequestSettings struct {
 	URLOriginal  string
 	Payload      string
 	Method       string
+	UserAgents   []string
 	Parameter    parameter.Parameter
 	RequestBase
 }
@@ -98,9 +96,7 @@ type Host struct {
 }
 
 var (
-	regexScheme      = regexp.MustCompile(`^*(.*?)*://`)
-	randomUserAgents = functions.FileToList(global.FILE_RANDOMAGENT)
-	ruaLength        = len(randomUserAgents)
+	regexScheme = regexp.MustCompile(`^?:\w+://`)
 )
 
 // Reques module that send and add the response data to the "results" channel and use "Response" as struct for dynamic temp variables:
@@ -114,8 +110,9 @@ func Request(client *http.Client, requestSettings RequestSettings) Result {
 	httpRequest.Header = requestSettings.Headers
 
 	//Add random headers (if set):
+	ruaLength := len(requestSettings.UserAgents)
 	if ruaLength > 0 && requestSettings.RandomUserAgent {
-		httpRequest.Header.Add("User-Agent", getRandomUserAgent())
+		httpRequest.Header.Add("User-Agent", requestSettings.UserAgents[rand.Intn(ruaLength-1)])
 	}
 
 	Timer := time.Now()
@@ -135,7 +132,7 @@ func Request(client *http.Client, requestSettings RequestSettings) Result {
 	//Read the response body content:
 	bodyBytes, err := io.ReadAll(response.Body)
 	if err != nil {
-		log.Println(design.STATUS.ERROR, "Could not read the response body:", err)
+		log.Println("Could not read the response body:", err)
 		return Result{Error: err}
 	}
 
@@ -163,26 +160,12 @@ func Request(client *http.Client, requestSettings RequestSettings) Result {
 			ContentLength: len(bodyString),
 			HeaderAmount:  len(response.Header),
 			Time:          responseTime,
-			LineCount:     functions.LineCount(bodyString),
-			WordCount:     functions.WordCount(bodyString),
+			LineCount:     len(strings.Split(bodyString, "\n")),
+			WordCount:     len(strings.Fields(bodyString)),
 			Body:          bodyString,
 			Response:      *response,
 		},
 	}
-}
-
-// Normalize common characters in the URL into URL-encode:
-func URLNormalize(s string) string {
-	var (
-		l_find        = []string{" ", "\t", "\n", "#", "&", "?"}
-		l_URLEncodeTo = []string{"%20", "%09", "%0a", "%23", "%26", "%3F"}
-	)
-	for i := 0; i < len(l_URLEncodeTo); i++ {
-		if strings.Contains(s, l_find[i]) {
-			s = strings.ReplaceAll(s, l_find[i], l_URLEncodeTo[i])
-		}
-	}
-	return s
 }
 
 // Get a list of IP addresses that the hostname resolves to
@@ -244,18 +227,13 @@ func ContainScheme(s string) string {
 }
 
 // Validate if the scheme is either http or https
-func ValidScheme(s string) bool {
+func ValidHTTPScheme(s string) bool {
 	return s == "http" || s == "https"
 }
 
 func ValidURLOrIP(s string) bool {
 	_, err := url.Parse(s)
 	return err == nil || net.ParseIP(s) != nil
-}
-
-// return a random 'User-Agent' from default/selected wordlist in memory
-func getRandomUserAgent() string {
-	return randomUserAgents[random.Rand.Intn(ruaLength)]
 }
 
 // Convert the *http.Header* to a string (type: "map[string][]string").

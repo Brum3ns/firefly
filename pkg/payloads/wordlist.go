@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/Brum3ns/firefly/pkg/encode"
 )
@@ -115,7 +117,7 @@ func (wl Wordlist) createPayloadWordlist(filePath string) []string {
 		if len(payload) > 0 {
 
 			if len(wl.PayloadReplace) > 0 {
-				payload = ReplaceRegex(payload, wl.PayloadReplace)
+				payload = replaceRegex(payload, wl.PayloadReplace)
 			}
 
 			//Check if payload should be encoded:
@@ -128,4 +130,10 @@ func (wl Wordlist) createPayloadWordlist(filePath string) []string {
 	}
 	file.Close()
 	return lst
+}
+
+func replaceRegex(p, regexReplace string) string {
+	i := strings.Split(regexReplace, " => ")
+	re := regexp.MustCompile(i[0])
+	return re.ReplaceAllString(p, i[1])
 }

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Brum3ns/firefly/pkg/firefly/global"
+	"github.com/Brum3ns/firefly/internal/global"
 )
 
 var Rand = rand.New(rand.NewSource(time.Now().UnixNano()))

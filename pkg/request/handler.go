@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Brum3ns/firefly/internal/waitgroup"
+	"github.com/Brum3ns/firefly/pkg/waitgroup"
 )
 
 type Handler struct {

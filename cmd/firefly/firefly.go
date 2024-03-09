@@ -7,12 +7,13 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/Brum3ns/firefly/internal/banner"
+	"github.com/Brum3ns/firefly/internal/config"
+	"github.com/Brum3ns/firefly/internal/global"
+	"github.com/Brum3ns/firefly/internal/option"
+	"github.com/Brum3ns/firefly/internal/precheck"
+	"github.com/Brum3ns/firefly/internal/runner"
 	"github.com/Brum3ns/firefly/pkg/design"
-	"github.com/Brum3ns/firefly/pkg/firefly/config"
-	"github.com/Brum3ns/firefly/pkg/firefly/global"
-	"github.com/Brum3ns/firefly/pkg/firefly/precheck"
-	"github.com/Brum3ns/firefly/pkg/option"
-	"github.com/Brum3ns/firefly/pkg/runner"
 )
 
 func main() {
@@ -24,8 +25,8 @@ func main() {
 	conf := config.NewConfigure(opt)
 
 	if !conf.TerminalUI {
-		design.Banner()
-		design.Disclaimer()
+		banner.Banner()
+		banner.Disclaimer()
 	}
 
 	//Listen for user keypress (CTRL + C):

@@ -11,9 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Brum3ns/firefly/pkg/fail"
-	fc "github.com/Brum3ns/firefly/pkg/functions"
-	"github.com/Brum3ns/firefly/pkg/option"
+	"github.com/Brum3ns/firefly/internal/fail"
+	"github.com/Brum3ns/firefly/internal/option"
 	"github.com/Brum3ns/firefly/pkg/request"
 )
 
@@ -122,6 +121,7 @@ func (f Filter) Run(Response request.Response) bool {
 	}
 	return false
 }
+
 func NewFilter(opt *option.Options) *Filter {
 	var (
 		//Syntax validation for filter rules:
@@ -132,7 +132,7 @@ func NewFilter(opt *option.Options) *Filter {
 				for _, i := range l {
 
 					//Check number based filters:
-					if fc.InLst(l_check, i) {
+					if inlst(l_check, i) {
 
 						//Only done in validation process (once) - loop is allowed:
 						if ok, _ := regexp.MatchString(reSyntax, i); i != "" && !ok {
@@ -372,4 +372,13 @@ func getRule(s string) string {
 		}
 	}
 	return rule
+}
+
+func inlst(l []string, s string) bool {
+	for _, i := range l {
+		if i != "" && i == s {
+			return true
+		}
+	}
+	return false
 }
