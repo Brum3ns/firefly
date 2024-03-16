@@ -248,6 +248,7 @@ func (r *Runner) listenerHTTP() {
 			if !r.VerifyMode {
 				storedKnowledge = r.StoredKnowledge[resultHTTP.TargetHashId]
 			}
+			// Note: payload included in the HTTP result:
 			r.handler.Scanner.AddJob(r.VerifyMode, resultHTTP, storedKnowledge)
 		}()
 	}
