@@ -54,7 +54,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	os.Exit(1)
 
 	//Display summary of the process:
 	fmt.Printf(
