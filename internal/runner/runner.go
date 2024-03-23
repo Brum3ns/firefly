@@ -191,7 +191,7 @@ func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, er
 	jobHandlerAmount := r.jobToHandler(&r.handler.HTTP)
 	r.waitForHandlers(jobHandlerAmount)
 
-	// Close the output file (if any output have been handled):
+	// Close the output file (if any output  have been handled):
 	if r.OutputOK {
 		if err := outputFileWriter.Close(); err != nil {
 			log.Fatal(err)
@@ -221,7 +221,6 @@ func (r *Runner) listenerScanner() {
 
 // Listen for HTTP request/response results from the request handler and add the response as a job to the scanner handler:
 func (r *Runner) listenerHTTP() {
-	var storedKnowledge = knowledge.Knowledge{}
 	for {
 		resultHTTP := <-r.channel.ListenerHTTP
 		r.stats.Request.Count()
@@ -245,11 +244,15 @@ func (r *Runner) listenerHTTP() {
 
 		//Give the scanner handler job related to the Http result (request/response):
 		go func() {
+			var (
+				storedKnowledge = knowledge.Knowledge{}
+				ok_knowledge    bool
+			)
 			if !r.VerifyMode {
-				storedKnowledge = r.StoredKnowledge[resultHTTP.TargetHashId]
+				storedKnowledge, ok_knowledge = r.StoredKnowledge[resultHTTP.TargetHashId]
 			}
 			// Note: payload included in the HTTP result:
-			r.handler.Scanner.AddJob(r.VerifyMode, resultHTTP, storedKnowledge)
+			r.handler.Scanner.AddJob(r.VerifyMode, ok_knowledge, storedKnowledge, resultHTTP)
 		}()
 	}
 }
@@ -364,7 +367,7 @@ func (r *Runner) waitForHandlers(jobHandlerAmount int) {
 	for {
 		time.Sleep(100 * time.Millisecond)
 		if jobHandlerAmount > 0 && jobHandlerAmount == r.handler.HTTP.GetJobAmount() && r.handler.HTTP.GetInProcess() == 0 {
-			break
+			return
 		}
 	}
 }
