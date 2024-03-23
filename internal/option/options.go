@@ -127,8 +127,8 @@ type Request struct {
 	UserAgent    string                          `flag:"ua" errorcode:"10007"`
 	SkipHeaders  string                          `flag:"sH" errorcode:"10008"`
 	Delay        int                             `flag:"D" errorcode:"10011"`
-	Timeout      int                             `flag:"T" errorcode:"10012"`
-	HTTP2        bool                            `flag:"T" errorcode:"10010"`
+	Timeout      int                             `flag:"timeout" errorcode:"10012"`
+	HTTP2        bool                            `flag:"timeout" errorcode:"10010"`
 	RandomAgent  bool                            `flag:"rua" errorcode:"10013"`
 	Headers      [][2]string                     `flag:"" errorcode:"100015"`
 	Random       map[string]int                  `flag:"" errorcode:"100014"`
@@ -250,7 +250,7 @@ func NewOptions() *Options {
 	flag.StringVar(&opt.FilterHeaderAmount, "fH", "", "Filter header amount")
 
 	//- [ Preformance ] -
-	flag.IntVar(&opt.Timeout, "T", 11, "Timeout in secounds before giving up on the response")
+	flag.IntVar(&opt.Timeout, "timeout", 11, "Timeout in secounds before giving up on the response")
 	flag.IntVar(&opt.Threads, "t", 50, "Threads (requests)")
 	flag.IntVar(&opt.ThreadsScanner, "tS", 3, "Number of processes to be run in the scanner (this can take up a lot of CPU usage if the value is too high)")
 	flag.IntVar(&opt.ThreadsExtract, "tE", 2, "Threads to be used to extract patterns from target response data (hardware)")
