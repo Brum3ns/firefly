@@ -3,6 +3,7 @@ package banner
 import (
 	"fmt"
 
+	"github.com/Brum3ns/firefly/internal/version"
 	"github.com/Brum3ns/firefly/pkg/design"
 )
 
@@ -14,7 +15,7 @@ func Banner() {
                           /_/
                                 (%s)
    By: @yeswehack : Brumens
-`, (design.COLOR.GREY + "v1.3.1" + design.COLOR.WHITE))
+`, (design.COLOR.GREY + version.VERSION + design.COLOR.WHITE))
 }
 
 func Disclaimer() {
