@@ -260,7 +260,7 @@ func NewOptions() *Options {
 	flag.IntVar(&opt.MaxConnsPerHost, "conn-host", 500, "Limits the total number of connections per host")
 
 	//- [ Display ] -
-	flag.BoolVar(&opt.TerminalUI, "tui", false, "Use advanced terminal user interface (UI)")
+	/*In development*/ //flag.BoolVar(&opt.TerminalUI, "tui", false, "Use advanced terminal user interface (UI)")
 	flag.BoolVar(&opt.NoDisplay, "no-display", false, "Do not display result to screen")
 	flag.BoolVar(&opt.ShowConfig, "show-config", false, "Display all configured parses and their values before the process starts")
 
@@ -453,6 +453,7 @@ func (opt *Options) setURLs_NoScheme(s string) error {
 		if validURL, ok := opt.validateURL(u); ok && !slices.Contains(opt.URLs, u) {
 			opt.URLs = append(opt.URLs, validURL)
 		}
+
 	}
 	return nil
 }
