@@ -2,17 +2,17 @@ package scan
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/Brum3ns/firefly/internal/config"
 	"github.com/Brum3ns/firefly/internal/knowledge"
 	"github.com/Brum3ns/firefly/internal/output"
 	"github.com/Brum3ns/firefly/pkg/request"
+	"github.com/Brum3ns/firefly/pkg/waitgroup"
 )
 
 type Handler struct {
 	Process   scan
-	WaitGroup sync.WaitGroup
+	WaitGroup waitgroup.WaitGroup
 	JobQueue  chan Job
 	Pool      chan chan Job
 	quit      chan bool
@@ -101,13 +101,23 @@ func (e *Handler) Run(listener chan<- Result) {
 }
 
 // Add new jobs (tasks) to be performed by the handler processes:
-func (e *Handler) AddJob(verifyMode bool, ok_knowledge bool, knowledge knowledge.Knowledge, httpResult request.Result) {
+func (e *Handler) AddJob(httpResult request.Result, knowledge knowledge.Knowledge, ok_knowledge bool) {
 	e.WaitGroup.Add(1)
 	e.JobQueue <- Job{
-		OK_knowledge: ok_knowledge,
 		Http:         httpResult,
 		Knowledge:    knowledge,
+		OK_knowledge: ok_knowledge,
 	}
+}
+
+// Get the amount of job that are active
+func (e *Handler) GetJobInProcess() int {
+	return e.WaitGroup.GetCount()
+}
+
+// Wait until all jobs are done
+func (e *Handler) Wait() {
+	e.WaitGroup.Wait()
 }
 
 func (e *Handler) Stop() {
