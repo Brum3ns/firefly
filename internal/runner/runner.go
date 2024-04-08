@@ -19,9 +19,9 @@ import (
 	"github.com/Brum3ns/firefly/internal/verbose"
 	"github.com/Brum3ns/firefly/pkg/design"
 	"github.com/Brum3ns/firefly/pkg/files"
+	"github.com/Brum3ns/firefly/pkg/httpprepare"
 	"github.com/Brum3ns/firefly/pkg/insertpoint"
 	"github.com/Brum3ns/firefly/pkg/payloads"
-	"github.com/Brum3ns/firefly/pkg/prepare"
 	"github.com/Brum3ns/firefly/pkg/request"
 	"github.com/Brum3ns/firefly/pkg/statistics"
 	"github.com/Brum3ns/firefly/pkg/waitgroup"
@@ -110,7 +110,7 @@ func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, er
 	var (
 		outputFileWriter = r.MustValidateOutput()
 		learnt           = make(map[string][]knowledge.Learnt)
-		display          = output.NewDisplay(r.Design)
+		display          = output.NewDisplay(r.Conf.Options.Diff, r.Design)
 		terminalUI       = ui.NewProgram()
 		wg               waitgroup.WaitGroup
 	)
@@ -152,7 +152,7 @@ func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, er
 					learnt[result.TargetHashId] = append(learnt[result.TargetHashId], knowledge.Learnt{
 						Payload:  result.Payload,
 						Extract:  result.Scanner.Extract,
-						HTMLNode: prepare.GetHTMLNode(result.Response.Body),
+						HTMLNode: httpprepare.GetHTMLNode(result.Response.Body),
 						Response: result.Response,
 					})
 					mutex.Unlock()
@@ -174,7 +174,7 @@ func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, er
 							terminalUI.Send(r.stats)
 							terminalUI.Send(result)
 						} else {
-							display.ToScreen(result, r.Conf.TerminalUI)
+							display.ToScreen(result)
 							progressbar.Print()
 						}
 					}
@@ -184,6 +184,7 @@ func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, er
 	}()
 
 	//Listeners
+	wg.Add(2)
 	go r.listenerScanner()
 	go r.listenerHTTP()
 
@@ -191,7 +192,11 @@ func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, er
 	jobHandlerAmount := r.jobToHandler(&r.handler.HTTP)
 	r.waitForHandlers(jobHandlerAmount)
 
-	// Close the output file (if any output  have been handled):
+	// Wait for the handlers to finish
+	r.handler.HTTP.Wait()
+	r.handler.Scanner.Wait()
+
+	// Close the output file (if any output  have been handled)
 	if r.OutputOK {
 		if err := outputFileWriter.Close(); err != nil {
 			log.Fatal(err)
@@ -246,13 +251,13 @@ func (r *Runner) listenerHTTP() {
 		go func() {
 			var (
 				storedKnowledge = knowledge.Knowledge{}
-				ok_knowledge    bool
+				ok_knowledge    = false
 			)
 			if !r.VerifyMode {
 				storedKnowledge, ok_knowledge = r.StoredKnowledge[resultHTTP.TargetHashId]
 			}
 			// Note: payload included in the HTTP result:
-			r.handler.Scanner.AddJob(r.VerifyMode, ok_knowledge, storedKnowledge, resultHTTP)
+			r.handler.Scanner.AddJob(resultHTTP, storedKnowledge, ok_knowledge)
 		}()
 	}
 }

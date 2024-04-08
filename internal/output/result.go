@@ -3,8 +3,8 @@ package output
 import (
 	"net/http"
 
-	"github.com/Brum3ns/firefly/pkg/difference"
 	"github.com/Brum3ns/firefly/pkg/extract"
+	"github.com/Brum3ns/firefly/pkg/httpdiff"
 	"github.com/Brum3ns/firefly/pkg/transformation"
 )
 
@@ -67,6 +67,6 @@ type Response struct {
 // Refer to the results of the scanning process
 type Scanner struct {
 	Extract        extract.Result        `json:"Extract"`
-	Diff           difference.Result     `json:"Diff"`
+	Diff           httpdiff.HTMLResult   `json:"Diff"`
 	Transformation transformation.Result `json:"Transformation"`
 }
