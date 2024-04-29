@@ -30,17 +30,16 @@ import (
 // The runner should contain the structures needed for all the processes.
 // It must NOT contain structures that need to be modified and/or dynamicly changed once the process is running.
 type Runner struct {
-	Count           int
-	OutputOK        bool
-	VerifyMode      bool
-	TerminalUIMode  bool
-	Conf            *config.Configure
-	Design          *design.Design
-	RequestTasks    *request.TaskStorage
-	stats           statistics.Statistic
-	channel         Channel
-	handler         Handler
-	StoredKnowledge map[string]knowledge.Knowledge
+	Count          int
+	OutputOK       bool
+	VerifyMode     bool
+	TerminalUIMode bool
+	Conf           *config.Configure
+	Design         *design.Design
+	RequestTasks   *request.TaskStorage
+	stats          statistics.Statistic
+	channel        Channel
+	handler        Handler
 }
 
 type Handler struct {
@@ -93,14 +92,13 @@ func NewRunner(conf *config.Configure, knowledgeStorage map[string]knowledge.Kno
 			}),
 
 			// Setup the HTTP scanner handler:
-			Scanner: scan.NewHandler(scan.Settings{
+			Scanner: scan.NewHandler(scan.Config{
 				Scanner:       conf.Scanner,
 				Threads:       conf.ThreadsScanner,
 				PayloadVerify: conf.Options.VerifyPayload,
 				Knowledge:     knowledgeStorage,
 			}),
 		},
-		StoredKnowledge: knowledgeStorage,
 	}
 }
 
@@ -110,7 +108,7 @@ func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, er
 	var (
 		outputFileWriter = r.MustValidateOutput()
 		learnt           = make(map[string][]knowledge.Learnt)
-		display          = output.NewDisplay(r.Conf.Options.Diff, r.Design)
+		display          = output.NewDisplay(r.Conf.Options.Detail, r.Design)
 		terminalUI       = ui.NewProgram()
 		wg               waitgroup.WaitGroup
 	)
@@ -248,17 +246,7 @@ func (r *Runner) listenerHTTP() {
 		}
 
 		//Give the scanner handler job related to the Http result (request/response):
-		go func() {
-			var (
-				storedKnowledge = knowledge.Knowledge{}
-				ok_knowledge    = false
-			)
-			if !r.VerifyMode {
-				storedKnowledge, ok_knowledge = r.StoredKnowledge[resultHTTP.TargetHashId]
-			}
-			// Note: payload included in the HTTP result:
-			r.handler.Scanner.AddJob(resultHTTP, storedKnowledge, ok_knowledge)
-		}()
+		r.handler.Scanner.AddJob(resultHTTP)
 	}
 }
 
