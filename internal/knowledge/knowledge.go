@@ -5,7 +5,7 @@ import (
 
 	"github.com/Brum3ns/firefly/internal/output"
 	"github.com/Brum3ns/firefly/pkg/extract"
-	"github.com/Brum3ns/firefly/pkg/prepare"
+	"github.com/Brum3ns/firefly/pkg/httpprepare"
 )
 
 type Knowledge struct {
@@ -16,15 +16,15 @@ type Knowledge struct {
 }
 
 type Combine struct {
-	Extract  extract.ResultCombine
-	HTMLNode prepare.HTMLNodeCombine
+	Extract    extract.ResultCombine
+	HTMLNode   httpprepare.HTMLNodeCombine
+	HeaderNode httpprepare.Header
 }
 
 type Learnt struct {
 	Payload  string
-	HTMLNode prepare.HTMLNode
+	HTMLNode httpprepare.HTMLNode
 	Extract  extract.Result
-
 	Response output.Response
 	Request  output.Request
 }
@@ -35,8 +35,9 @@ func NewKnowledge() *Knowledge {
 
 func NewCombine() Combine {
 	return Combine{
-		Extract:  extract.NewCombine(),
-		HTMLNode: prepare.NewCombineHTMLNode(),
+		Extract:    extract.NewCombine(),
+		HTMLNode:   httpprepare.NewCombineHTMLNode(),
+		HeaderNode: httpprepare.NewHeader(),
 	}
 }
 
@@ -51,11 +52,13 @@ func GetKnowledge(learnt map[string][]Learnt) map[string]Knowledge {
 			k.Requests = append(k.Requests, d.Request)
 			k.Responses = append(k.Responses, d.Response)
 
+			k.Combine.HeaderNode = c.HeaderNode.Merge(d.Response.Headers)
 			k.Combine.Extract = combineAppendMaps(reflect.ValueOf(&c.Extract), d.Extract).(extract.ResultCombine)
-			k.Combine.HTMLNode = combineAppendMaps(reflect.ValueOf(&c.HTMLNode), d.HTMLNode).(prepare.HTMLNodeCombine)
+			k.Combine.HTMLNode = combineAppendMaps(reflect.ValueOf(&c.HTMLNode), d.HTMLNode).(httpprepare.HTMLNodeCombine)
 		}
 		storedKnowledge[hashId] = k
 	}
+
 	return storedKnowledge
 }
 
