@@ -103,6 +103,16 @@ func (h *Handler) AddJob(job RequestSettings) {
 	h.JobQueue <- job
 }
 
+// Get the amount of job that are active
+func (e *Handler) GetJobInProcess() int {
+	return e.WaitGroup.GetCount()
+}
+
+// Wait until all jobs are done
+func (e *Handler) Wait() {
+	e.WaitGroup.Wait()
+}
+
 // Send a stop signal to the handler
 func (h *Handler) Stop() {
 	h.stop <- true
