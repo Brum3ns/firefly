@@ -67,6 +67,6 @@ type Response struct {
 // Refer to the results of the scanning process
 type Scanner struct {
 	Extract        extract.Result        `json:"Extract"`
-	Diff           httpdiff.HTMLResult   `json:"Diff"`
+	Diff           httpdiff.Result       `json:"Diff"`
 	Transformation transformation.Result `json:"Transformation"`
 }
