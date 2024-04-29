@@ -96,7 +96,7 @@ type Host struct {
 }
 
 var (
-	regexScheme = regexp.MustCompile(`^?:\w+://`)
+	regexScheme = regexp.MustCompile(`^(.*?)://`)
 )
 
 // Reques module that send and add the response data to the "results" channel and use "Response" as struct for dynamic temp variables:
@@ -220,7 +220,9 @@ func SetPostbody(body string) *bytes.Buffer {
 // Check if a URL contains a scheme (any type)
 // Return the scheme or an empty string if no scheme was presented in the given URL.
 func ContainScheme(s string) string {
+	fmt.Println(s)
 	if lst_scheme := regexScheme.FindStringSubmatch(s); len(lst_scheme) > 0 {
+		fmt.Println(lst_scheme)
 		return lst_scheme[1]
 	}
 	return ""
