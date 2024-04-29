@@ -90,6 +90,7 @@ type Display struct {
 	ShowConfig  bool `flag:"show-config" errorcode:"5004"`
 	TerminalUI  bool `flag:"tui" errorcode:"5005"`
 	Verbose     bool `flag:"v" errorcode:"5006"`
+	Detail      bool `flag:"detail" errorcode:"5007"`
 }
 
 // ////////////// Payload //////////////// //
@@ -126,7 +127,7 @@ type Request struct {
 	PostData     string                          `flag:"d" errorcode:"10006"`
 	UserAgent    string                          `flag:"ua" errorcode:"10007"`
 	SkipHeaders  string                          `flag:"sH" errorcode:"10008"`
-	Delay        int                             `flag:"D" errorcode:"10011"`
+	Delay        int                             `flag:"delay" errorcode:"10011"`
 	Timeout      int                             `flag:"timeout" errorcode:"10012"`
 	HTTP2        bool                            `flag:"timeout" errorcode:"10010"`
 	RandomAgent  bool                            `flag:"rua" errorcode:"10013"`
@@ -254,13 +255,14 @@ func NewOptions() *Options {
 	flag.IntVar(&opt.Threads, "t", 50, "Threads (requests)")
 	flag.IntVar(&opt.ThreadsScanner, "tS", 3, "Number of processes to be run in the scanner (this can take up a lot of CPU usage if the value is too high)")
 	flag.IntVar(&opt.ThreadsExtract, "tE", 2, "Threads to be used to extract patterns from target response data (hardware)")
-	flag.IntVar(&opt.Delay, "D", 0, "Delay in milliseconds (ms) between each request each thread")
+	flag.IntVar(&opt.Delay, "delay", 0, "Delay in milliseconds (ms) between each request each thread")
 	flag.IntVar(&opt.MaxIdleConns, "idle", 1000, "Controls the maximum number of idle (keep-alive) connections across all hosts")
 	flag.IntVar(&opt.MaxIdleConnsPerHost, "idle-host", 500, "Controls the maximum idle (keep-alive) connections to keep per-host")
 	flag.IntVar(&opt.MaxConnsPerHost, "conn-host", 500, "Limits the total number of connections per host")
 
 	//- [ Display ] -
 	/*In development*/ //flag.BoolVar(&opt.TerminalUI, "tui", false, "Use advanced terminal user interface (UI)")
+	flag.BoolVar(&opt.Detail, "detail", false, "Show the difference discovered in an unexpected behavior")
 	flag.BoolVar(&opt.NoDisplay, "no-display", false, "Do not display result to screen")
 	flag.BoolVar(&opt.ShowConfig, "show-config", false, "Display all configured parses and their values before the process starts")
 
