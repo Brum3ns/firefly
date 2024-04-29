@@ -16,27 +16,28 @@ type Handler struct {
 	JobQueue  chan Job
 	Pool      chan chan Job
 	quit      chan bool
-	Settings
+	Config
 }
 
-// Settings given by user input to adapt the scanning process
-type Settings struct {
+// Config given by user input to adapt the scanning process
+type Config struct {
 	Threads       int
 	PayloadVerify string
 
-	//The scanner contains the points to a base structure that contains the base structure
-	//of all the scanner techniques the handler need. This save memory and gain better preformence in the overall preformance.
-	//Note : (Static data stored. Read struct DESC)
+	// The scanner contains the points to a base structure that contains the base structure
+	// of all the scanner techniques the handler need. This save memory and gain better preformence in the overall preformance.
+	// Note : (Static data stored. Read struct DESC)
 	Scanner *config.Scanner
 
-	//This map holds all the knowledge of all the targets
-	//!Note : (This map *MUST* be static and not modifed)
+	// This map holds all the knowledge of all the targets
+	// !Note : (This map *MUST* be static and not modifed)
 	Knowledge map[string]knowledge.Knowledge
 }
 
 type Job struct {
 	OK_knowledge bool
 	Knowledge    knowledge.Knowledge
+	Encode       []string
 	Http         request.Result
 }
 
@@ -47,9 +48,9 @@ type Result struct {
 }
 
 // Start the handler for the workers by giving the tasks to preform and the amount of workers.
-func NewHandler(properties Settings) Handler {
+func NewHandler(properties Config) Handler {
 	return Handler{
-		Settings: properties,
+		Config:   properties,
 		JobQueue: make(chan Job),
 		Pool:     make(chan chan Job, properties.Threads),
 	}
@@ -65,13 +66,13 @@ func (e *Handler) Run(listener chan<- Result) {
 		e.Threads = 1
 	}
 
-	//Start the amount of processes related to the amount of given threads:
+	// Start the amount of processes related to the amount of given threads:
 	for i := 0; i < e.Threads; i++ {
-		e.Process = newScan(e.Knowledge, e.Scanner, e.Pool)
+		e.Process = newScan(e.Config.Scanner, e.Pool)
 		e.Process.spawnScan(pResult)
 	}
 
-	//Listen for new jobs from the queue and send it to the job channel for the workers to handle it:
+	// Listen for new jobs from the queue and send it to the job channel for the workers to handle it:
 	go func() {
 		for {
 			select {
@@ -92,7 +93,7 @@ func (e *Handler) Run(listener chan<- Result) {
 		}
 	}()
 
-	//Listen a stop signal then wait until all background processes are completed:
+	// Listen a stop signal then wait until all background processes are completed:
 	if <-e.quit {
 		e.WaitGroup.Wait()
 		fmt.Println(":: Scanner handler stopped")
@@ -101,13 +102,21 @@ func (e *Handler) Run(listener chan<- Result) {
 }
 
 // Add new jobs (tasks) to be performed by the handler processes:
-func (e *Handler) AddJob(httpResult request.Result, knowledge knowledge.Knowledge, ok_knowledge bool) {
+func (e *Handler) AddJob(httpResult request.Result) {
+	// Get knowledge for the specific target
+	knowledge, ok := e.GetKnowledge(httpResult.TargetHashId)
+
 	e.WaitGroup.Add(1)
 	e.JobQueue <- Job{
 		Http:         httpResult,
 		Knowledge:    knowledge,
-		OK_knowledge: ok_knowledge,
+		OK_knowledge: ok,
 	}
+}
+
+func (e *Handler) GetKnowledge(hashid string) (knowledge.Knowledge, bool) {
+	knowledge, ok := e.Knowledge[hashid]
+	return knowledge, ok
 }
 
 // Get the amount of job that are active
