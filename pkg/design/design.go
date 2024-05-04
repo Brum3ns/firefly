@@ -5,77 +5,6 @@ import (
 	"strconv"
 )
 
-// Store all design values
-type Design struct {
-	Color
-	Icons
-	Debug
-	Detect
-	Status
-	Behavior
-}
-
-type Color struct {
-	WHITE       string
-	WHITEBG     string
-	BLACK       string
-	GREY        string
-	GREYLIGHT   string
-	GREYBG      string
-	RED         string
-	REDLIGHT    string
-	REDBG       string
-	ORANGE      string
-	ORANGELIGHT string
-	ORANGEBG    string
-	YELLOW      string
-	GREEN       string
-	GREENLIGHT  string
-	BLUE        string
-	BLUELIGHT   string
-	PINK        string
-	PURPEL      string
-}
-
-type Icons struct {
-	PLUS     string
-	AWARE    string
-	NEGATIVE string
-	POSSIBLE string
-}
-
-type Status struct {
-	OK       string
-	SUCCESS  string
-	INFO     string
-	FAIL     string
-	ERROR    string
-	WARNING  string
-	CRITICAL string
-}
-
-type Detect struct {
-	Firm      string
-	Certain   string
-	Tentative string
-}
-
-type Debug struct {
-	DEBUG   string
-	PAYLOAD string
-	INPUT   string
-	EXAMPLE string
-}
-
-type Behavior struct {
-	NONE           string
-	DIFF           string
-	TIME           string
-	REFLECT        string
-	TRANSFORMATION string
-	PATTERN        string
-}
-
 // static [Icons] and design variables:
 var (
 	// Colors:
@@ -168,6 +97,77 @@ var (
 	}
 )
 
+// Store all design values
+type Design struct {
+	Color
+	Icons
+	Debug
+	Detect
+	Status
+	Behavior
+}
+
+type Color struct {
+	WHITE       string
+	WHITEBG     string
+	BLACK       string
+	GREY        string
+	GREYLIGHT   string
+	GREYBG      string
+	RED         string
+	REDLIGHT    string
+	REDBG       string
+	ORANGE      string
+	ORANGELIGHT string
+	ORANGEBG    string
+	YELLOW      string
+	GREEN       string
+	GREENLIGHT  string
+	BLUE        string
+	BLUELIGHT   string
+	PINK        string
+	PURPEL      string
+}
+
+type Icons struct {
+	PLUS     string
+	AWARE    string
+	NEGATIVE string
+	POSSIBLE string
+}
+
+type Status struct {
+	OK       string
+	SUCCESS  string
+	INFO     string
+	FAIL     string
+	ERROR    string
+	WARNING  string
+	CRITICAL string
+}
+
+type Detect struct {
+	Firm      string
+	Certain   string
+	Tentative string
+}
+
+type Debug struct {
+	DEBUG   string
+	PAYLOAD string
+	INPUT   string
+	EXAMPLE string
+}
+
+type Behavior struct {
+	NONE           string
+	DIFF           string
+	TIME           string
+	REFLECT        string
+	TRANSFORMATION string
+	PATTERN        string
+}
+
 func NewDesign() *Design {
 	return &Design{
 		Color:    *COLOR,
@@ -219,7 +219,7 @@ func (d *Design) ResponseTime(time float64) string {
 }
 
 // Colorize the Content Length and return it as a string
-func (d *Design) IsDiff(value int) string {
+func (d *Design) Highlight(value int) string {
 	v := strconv.Itoa(value)
 	if value != 0 {
 		return d.Color.REDBG + v + d.Color.WHITE
