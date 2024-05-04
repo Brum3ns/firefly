@@ -4,11 +4,10 @@ import (
 	"log"
 
 	"github.com/Brum3ns/firefly/internal/config"
-	"github.com/Brum3ns/firefly/internal/knowledge"
 	"github.com/Brum3ns/firefly/pkg/design"
-	"github.com/Brum3ns/firefly/pkg/difference"
 	"github.com/Brum3ns/firefly/pkg/extract"
-	"github.com/Brum3ns/firefly/pkg/prepare"
+	"github.com/Brum3ns/firefly/pkg/httpdiff"
+	"github.com/Brum3ns/firefly/pkg/httpprepare"
 	"github.com/Brum3ns/firefly/pkg/request"
 	"github.com/Brum3ns/firefly/pkg/transformation"
 )
@@ -17,28 +16,24 @@ import (
 type scan struct {
 	jobChannel chan Job
 	pool       chan chan Job
-	Scanner    *config.Scanner //!Note : (Static data stored. Read struct DESC)
-	Result     scanResult      //<-Returned
 
-	//Knowledge  map[string][]verify.TargetKnowledge //Note : (Should be a pointer of "Properties.VerifyStorage")
-	Knowledge map[string]knowledge.Knowledge
+	Scanner *config.Scanner //!Note : (Static data stored. Read struct DESC)
+	Result  scanResult
 }
 
 type scanResult struct {
 	UnkownBehavior bool
 	Http           request.Result
 	Extract        extract.Result
-	Difference     difference.Result
+	Difference     httpdiff.Result
 	Transformation transformation.Result
 }
 
 // Create a new scan
-func newScan(knowl map[string]knowledge.Knowledge, scanner *config.Scanner, pool chan chan Job) scan {
+func newScan(scanner *config.Scanner, pool chan chan Job) scan {
 	return scan{
-		Knowledge: knowl,
-		pool:      pool,
-		Scanner:   scanner,
-		//Knowledge:  verifiedStorage,
+		pool:       pool,
+		Scanner:    scanner,
 		jobChannel: make(chan Job),
 	}
 }
@@ -62,56 +57,32 @@ func (s scan) spawnScan(result chan scanResult) {
 // Start a new process
 func (s scan) scan(job Job) scanResult {
 	var (
-		//wg sync.WaitGroup
-
-		// Confirm that we do have knowledge about our current target:
-		//targetKnowledge, ok_knowledge = s.Knowledge[job.Http.TargetHashId]
-
 		//Behavior contains the methods that check unknown behavior along with the behavioral status of the current job:
 		behavior = NewBehavior()
 
+		// Scanning techniques
 		ResultExtract        extract.Result
-		ResultDifference     difference.Result
+		ResultDifference     httpdiff.Result
 		ResultTransformation transformation.Result
 	)
 
 	//Quick basic behavior checks:
-	/* if ok_knowledge {
-		behavior.status = behavior.QuickDetect(job.Http.Response, targetKnowledge)
-	} */
+	if job.OK_knowledge {
+		behavior.status = behavior.QuickDetect(job)
+	}
 
 	//Check if we should preform scanner techniques or not:
 	if !s.Scanner.DisablesTechniques {
-		ResultDifference = s.Difference(&job)
-		ResultExtract = s.Extract(&job)
-		ResultTransformation = s.Transformation(&job)
 
-		/* 	// Difference scan
 		if s.Scanner.OK_Diff {
-			wg.Add(1)
-			go func() {
-				ResultDifference = s.Difference(&job)
-				wg.Done()
-			}()
+			ResultDifference = s.Difference(job)
 		}
-		// Extract scan
 		if s.Scanner.OK_Extract {
-			wg.Add(1)
-			go func() {
-				ResultExtract = s.Extract(&job)
-				wg.Done()
-			}()
+			ResultExtract = s.Extract(job)
 		}
-		// Transformation scan
 		if s.Scanner.OK_Transformation {
-			wg.Add(1)
-			go func() {
-				ResultTransformation = s.Transformation(&job)
-				wg.Done()
-			}()
+			ResultTransformation = s.Transformation(job)
 		}
-		// Wait until all the scans are done
-		wg.Wait() */
 	}
 
 	//Confirm the unexpected behavior
@@ -128,12 +99,12 @@ func (s scan) scan(job Job) scanResult {
 	}
 }
 
-func (s scan) Extract(job *Job) extract.Result {
+// Scan for errors, patterns in the response that have been triggered by the payload
+func (s scan) Extract(job Job) extract.Result {
 	e := s.Scanner.Extract
 	e.AddJob(
 		job.Http.Response.Body,
 		job.Http.Response.HeaderString,
-		//p.Scanner.Extract.Known,
 	)
 
 	result := e.Run()
@@ -175,27 +146,32 @@ func (s scan) Extract(job *Job) extract.Result {
 	return result
 }
 
-func (s scan) Difference(job *Job) difference.Result {
+// Scan for differences in the current compare to the known HTTP responses
+func (s scan) Difference(job Job) httpdiff.Result {
 	//Make a new difference instant and provided the current HTTP response body and headers:
-	diff := difference.NewDifference(
-		difference.Properties{
-			Payload:          job.Http.Payload,
-			PayloadVerify:    job.Knowledge.PayloadVerify,
-			CompareHTMLNodes: job.Knowledge.Combine.HTMLNode,
-			ResponseBody: &difference.ResponseBody{
-				Body:     job.Http.Response.Body,
-				HtmlNode: prepare.GetHTMLNode(job.Http.Response.Body),
-			},
-			ResponseHeaders: &difference.ResponseHeaders{
-				HeaderString: job.Http.Response.HeaderString,
-				Headers:      job.Http.Response.Header,
+	diff := httpdiff.NewDifference(
+		httpdiff.Settings{
+			Payload:       job.Http.Payload,
+			PayloadVerify: job.Knowledge.PayloadVerify,
+			Compare: httpdiff.Compare{
+				HTMLMergeNode:   job.Knowledge.Combine.HTMLNode,
+				HeaderMergeNode: job.Knowledge.Combine.HeaderNode,
 			},
 		},
 	)
-	return diff.Run()
+
+	headerResult := diff.GetHeadersDiff(httpprepare.GetHeaderNode(job.Http.Response.Header))
+	htmlResult := diff.GetHTMLNodeDiff(httpprepare.GetHTMLNode(job.Http.Response.Body))
+
+	return httpdiff.Result{
+		OK:           (headerResult.OK || htmlResult.OK),
+		HeaderResult: headerResult,
+		HTMLResult:   htmlResult,
+	}
 }
 
-func (s scan) Transformation(job *Job) transformation.Result {
+// Scan for transformations within the payload
+func (s scan) Transformation(job Job) transformation.Result {
 	tfmt := s.Scanner.Transformation
 	return tfmt.Detect(job.Http.Response.Body, job.Http.Payload)
 }
