@@ -3,8 +3,10 @@ package output
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/Brum3ns/firefly/pkg/design"
+	"github.com/Brum3ns/firefly/pkg/httpprepare"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -22,8 +24,8 @@ var (
 
 type Display struct {
 	ResultFinal
-	difference bool
-	design     *design.Design
+	detailed bool
+	design   *design.Design
 
 	style
 }
@@ -34,8 +36,8 @@ type style struct {
 
 func NewDisplay(detailed bool, design *design.Design) *Display {
 	return &Display{
-		difference: detailed,
-		design:     design,
+		detailed: detailed,
+		design:   design,
 	}
 }
 
@@ -52,10 +54,17 @@ func (d *Display) ToScreen(result ResultFinal) {
 	d.ResultFinal = result
 	//print("\033[?25l")
 
+	boxChar := "╰╴"
+	if d.detailed {
+		boxChar = "├╴"
+	}
+
+	diff := d.Scanner.Diff
+
 	stout := fmt.Sprintf("%s╭ \033[33m%s\033[0m Status:%s, Words:%s, Lines:%s, CL:%s, CT:%s, Time:%sms\n"+
-		"╰╴Errors:[Body:%s, Header:%s] Diff:[Tag:%s, Attr:%s, AttrVal:%s, Words:%s, Comments:%s, Header:%s, HeaderVal:%s] %s\n",
+		"%sErrors:[Body:%s, Header:%s] Diff:[Tag:%s, Attr:%s, AttrVal:%s, Words:%s, Comments:%s, Header:%s] %s\n",
 		TERMINAL_CLEAR,
-		strconv.Quote(d.Payload),
+		d.Payload,
 		// Response information
 		d.design.StatusCode(d.Response.StatusCode),
 		d.design.WordCount(d.Response.WordCount),
@@ -63,31 +72,109 @@ func (d *Display) ToScreen(result ResultFinal) {
 		d.design.ContentLength(d.Response.ContentLength),
 		d.design.ContentType(d.Response.ContentType),
 		d.design.ResponseTime(d.Response.Time),
+		// Box Draw character
+		boxChar,
 		//Extract:
 		//d.design.Diff(d.Scanner.Extract.TotalHits),
-		d.design.Diff(len(d.Scanner.Extract.PatternBody)),
-		d.design.Diff(len(d.Scanner.Extract.PatternHeaders)),
+		d.design.Highlight(len(d.Scanner.Extract.PatternBody)),
+		d.design.Highlight(len(d.Scanner.Extract.PatternHeaders)),
 		//Difference - HTMLNode:
-		d.design.Diff(
-			d.Scanner.Diff.HTMLNodeDiff.TagStartHits+
-				d.Scanner.Diff.HTMLNodeDiff.TagEndHits+
-				d.Scanner.Diff.HTMLNodeDiff.TagSelfClose,
+		d.design.Highlight(
+			diff.HTMLResult.Appear.TagStartHits+
+				diff.HTMLResult.Appear.TagEndHits+
+				diff.HTMLResult.Appear.TagSelfCloseHits,
 		),
-		d.design.Diff(d.Scanner.Diff.HTMLNodeDiff.AttributeHits),
-		d.design.Diff(d.Scanner.Diff.HTMLNodeDiff.AttributeValueHits),
-		d.design.Diff(d.Scanner.Diff.HTMLNodeDiff.WordsHits),
-		d.design.Diff(d.Scanner.Diff.HTMLNodeDiff.CommentHits),
+		d.design.Highlight(diff.HTMLResult.Appear.AttributeHits),
+		d.design.Highlight(diff.HTMLResult.Appear.AttributeValueHits),
+		d.design.Highlight(diff.HTMLResult.Appear.WordsHits),
+		d.design.Highlight(diff.HTMLResult.Appear.CommentHits),
 		//Difference - Headers:
-		"000", //d.design.Diff(d.Scanner.Diff.Headers),
-		"000", //d.design.Diff(d.Scanner.Diff.Headers),
+		d.design.Highlight(diff.HeaderResult.HeaderHits),
 		d.transformation(),
 	)
 
-	if d.difference {
-		//Code...
+	if d.detailed {
+		prefix := "|"
+		stout += "\n├╴[Header]\n" +
+			d.getDetailDiff("Appear", strings.Join(headerNodeToLst(prefix, diff.HeaderResult.Appear), "\n")) +
+			d.getDetailDiff("Disapear", strings.Join(headerNodeToLst(prefix, diff.HeaderResult.Disappear), "\n")) +
+			"\n├╴[HTML]\n" +
+			d.getDetailDiff("Appear", strings.Join(htmlNodeToLst(prefix, diff.HTMLResult.Appear.HTMLNode), "\n")) +
+			d.getDetailDiff("Disappear", strings.Join(htmlNodeToLst(prefix, diff.HTMLResult.Disappear.HTMLNode), "\n"))
 	}
 	fmt.Println(stout)
+}
 
+func (d *Display) getDetailDiff(title, s string) string {
+	if len(s) > 0 {
+		return fmt.Sprintf("├╴%s\n%s\n", title, (d.design.Color.GREY + s + d.design.Color.WHITE))
+	}
+	return ""
+}
+
+func htmlNodeLst(htmlNode string) {
+
+}
+
+func headerNodeToLst(prefix string, headerNode httpprepare.Header) []string {
+	var lst []string
+	// Todo ...
+	for header, headerInfo := range headerNode {
+		s := ""
+		// Check the amount of items in the lists of header info:
+		if len(headerInfo.Amount) == 1 && len(headerInfo.Values) == 1 {
+			s = fmt.Sprintf("%s(%d) : %s: %s", prefix, headerInfo.Amount[0], header, headerInfo.Values[0])
+
+			// This should not be possible, but just in case, output it if it happen to be
+		} else {
+			s = fmt.Sprintf("%s(%d) : %s:\n\t%s", prefix, headerInfo.Amount, header, strings.Join(headerInfo.Values, "\n"))
+		}
+		lst = append(lst, s)
+	}
+
+	return lst
+}
+
+func htmlNodeToLst(prefix string, htmlnode httpprepare.HTMLNode) []string {
+	var lst []string
+
+	if len(htmlnode.TagStart) > 0 {
+		lst = append(lst,
+			fmt.Sprintf("%sTag-start: %v", prefix, htmlnode.TagStart),
+		)
+	}
+	if len(htmlnode.TagEnd) > 0 {
+		lst = append(lst,
+			fmt.Sprintf("%sTag-end: %v", prefix, htmlnode.TagEnd),
+		)
+	}
+	if len(htmlnode.TagSelfClose) > 0 {
+		lst = append(lst,
+			fmt.Sprintf("%sTag-selfclose: %v", prefix, htmlnode.TagSelfClose),
+		)
+	}
+	if len(htmlnode.Attribute) > 0 {
+		lst = append(lst,
+			fmt.Sprintf("%sAttribute: %v", prefix, htmlnode.Attribute),
+		)
+	}
+	if len(htmlnode.AttributeValue) > 0 {
+		lst = append(lst,
+			fmt.Sprintf("%sAttributeValue: %v", prefix, htmlnode.AttributeValue),
+		)
+	}
+	if len(htmlnode.Comment) > 0 {
+		lst = append(lst,
+			fmt.Sprintf("%sComment: %v", prefix, htmlnode.Comment),
+		)
+	}
+	if len(htmlnode.Words) > 0 {
+		lst = append(lst,
+			fmt.Sprintf("%sWords: %v", prefix, htmlnode.Words),
+		)
+	}
+
+	return lst
 }
 
 // Display payload transformation:
