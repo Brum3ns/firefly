@@ -75,9 +75,9 @@ func GetHTMLNode(body string) HTMLNode {
 		}
 
 		//Check what type of token and sort it into the HTML [struct]ure:
+		t := tokenizer.Token()
 		switch typ {
 		case html.StartTagToken:
-			t := tokenizer.Token()
 			htmlNode.TagStart[t.Data]++
 			for _, attr := range t.Attr {
 				htmlNode.Attribute[attr.Key]++
@@ -85,7 +85,6 @@ func GetHTMLNode(body string) HTMLNode {
 			}
 
 		case html.EndTagToken:
-			t := tokenizer.Token()
 			htmlNode.TagEnd[t.Data]++
 			for _, attr := range t.Attr {
 				htmlNode.Attribute[attr.Key]++
@@ -93,21 +92,18 @@ func GetHTMLNode(body string) HTMLNode {
 			}
 
 		case html.TextToken:
-			t := tokenizer.Token()
 			for _, w := range strings.Fields(t.Data) {
 				htmlNode.Words[w]++
 			}
 			//htmlNode.Text[t.Data]++
 
 		case html.CommentToken:
-			t := tokenizer.Token()
 			for _, w := range strings.Fields(t.Data) {
 				htmlNode.Words[w]++
 			}
 			htmlNode.Comment[t.Data]++
 
 		case html.SelfClosingTagToken:
-			t := tokenizer.Token()
 			htmlNode.TagSelfClose[t.Data]++
 			for _, attr := range t.Attr {
 				htmlNode.Attribute[attr.Key]++
