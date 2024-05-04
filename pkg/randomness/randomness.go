@@ -26,7 +26,7 @@ func IsRandom(s string, ignoreNumbers bool) bool {
 	for _, r := range s {
 
 		// Check if the rune is a valid digit
-		if (ignoreNumbers || IsNumber(r)) || IsVocal(r) || r == '_' {
+		if IsVocal(r) || r == '_' || ignoreNumbers || IsNumber(r) {
 			hit = 0
 		} else {
 			hit++
