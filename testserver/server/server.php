@@ -7,10 +7,10 @@ if ( isset($_GET['crlf']) ) {
     $crlf =  $_GET['crlf'];
 
     if ( str_contains($crlf, '"') === false ) {
-        echo "HEADER => APPEAR";
         header('X-Deleted: true');
         header('X-Appear: APPEAR');
     } else {
+        header('X-Normal: normalResponse');    
         header('X-Appear: false');    
     }
     
