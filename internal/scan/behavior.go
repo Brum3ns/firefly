@@ -1,10 +1,5 @@
 package scan
 
-import (
-	"github.com/Brum3ns/firefly/internal/knowledge"
-	"github.com/Brum3ns/firefly/pkg/request"
-)
-
 type behavior struct {
 	status bool
 }
@@ -14,17 +9,17 @@ func NewBehavior() *behavior {
 }
 
 // Quick detection for unkown behavior
-func (b *behavior) QuickDetect(http request.Response, known knowledge.Knowledge) bool {
+func (b *behavior) QuickDetect(job Job) bool {
 	count := 0
-	countMax := len(known.Responses) * 3 //Note : (Number represents the number of if statements in the loop)
-	for _, resp := range known.Responses {
-		if resp.StatusCode == http.StatusCode {
+	countMax := len(job.Knowledge.Responses) * 3 //Note : (Number represents the number of if statements in the loop)
+	for _, resp := range job.Knowledge.Responses {
+		if resp.StatusCode == job.Http.Response.StatusCode {
 			count++
 		}
-		if resp.Title == http.Title {
+		if resp.Title == job.Http.Response.Title {
 			count++
 		}
-		if resp.ContentType == http.ContentType {
+		if resp.ContentType == job.Http.Response.ContentType {
 			count++
 		}
 	}
