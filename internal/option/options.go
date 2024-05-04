@@ -14,8 +14,8 @@ import (
 
 	"github.com/Brum3ns/firefly/internal/fail"
 	"github.com/Brum3ns/firefly/internal/global"
-	"github.com/Brum3ns/firefly/internal/info"
 	"github.com/Brum3ns/firefly/internal/update"
+	"github.com/Brum3ns/firefly/internal/version"
 	"github.com/Brum3ns/firefly/pkg/design"
 	"github.com/Brum3ns/firefly/pkg/files"
 	"github.com/Brum3ns/firefly/pkg/parameter"
@@ -286,7 +286,7 @@ func NewOptions() *Options {
 	//Show Firefly version OR update the resources:
 	switch {
 	case opt.Version:
-		fmt.Println(info.VERSION)
+		fmt.Println(version.VERSION)
 		os.Exit(0)
 		//VersionFirefly()
 	case opt.UpdateResource:
