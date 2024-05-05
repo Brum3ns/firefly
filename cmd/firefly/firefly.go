@@ -11,14 +11,17 @@ import (
 	"github.com/Brum3ns/firefly/internal/config"
 	"github.com/Brum3ns/firefly/internal/global"
 	"github.com/Brum3ns/firefly/internal/option"
-	"github.com/Brum3ns/firefly/internal/precheck"
 	"github.com/Brum3ns/firefly/internal/runner"
+	"github.com/Brum3ns/firefly/internal/setup"
 	"github.com/Brum3ns/firefly/pkg/design"
 )
 
 func main() {
 	//Check resources before starting (first time use):
-	precheck.Setup()
+	if _, err := setup.Setup(); err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
 
 	//Configure needed resources
 	opt := option.NewOptions()
