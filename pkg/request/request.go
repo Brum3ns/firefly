@@ -220,7 +220,6 @@ func SetPostbody(body string) *bytes.Buffer {
 // Check if a URL contains a scheme (any type)
 // Return the scheme or an empty string if no scheme was presented in the given URL.
 func ContainScheme(s string) string {
-	fmt.Println(s)
 	if lst_scheme := regexScheme.FindStringSubmatch(s); len(lst_scheme) > 0 {
 		fmt.Println(lst_scheme)
 		return lst_scheme[1]
