@@ -290,7 +290,8 @@ func NewOptions() *Options {
 		os.Exit(0)
 		//VersionFirefly()
 	case opt.UpdateResource:
-		update.Resources()
+		update.DB()
+		os.Exit(0)
 	}
 
 	//Set Option values that wasen't possible in the flag process direcly:
