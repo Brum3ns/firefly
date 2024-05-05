@@ -15,6 +15,7 @@ func Banner() {
                           /_/
                                 (%s)
    By: @yeswehack : Brumens
+
 `, (design.COLOR.GREY + version.VERSION + design.COLOR.WHITE))
 }
 
