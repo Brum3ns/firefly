@@ -31,12 +31,20 @@ Firefly is an advanced black-box fuzzer and not just a standard asset discovery 
 
 # Installation
 
-```
+## Golang
+
+```bash
 go install -v github.com/Brum3ns/firefly/cmd/firefly@latest
-```
-or
-```
+# or
 go get -v github.com/Brum3ns/firefly/cmd/firefly
+```
+
+## Docker
+
+```bash
+docker build -t firefly:latest .
+alias firefly='docker run --rm -it --net=host -v "$PWD:/firefly/" firefly:latest'
+firefly -u 'http://example.com/?query=FUZZ/'
 ```
 
 <!--
