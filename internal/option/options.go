@@ -38,6 +38,7 @@ type Options struct {
 	Preformance
 	General
 	File
+	Randomness
 }
 
 // ////////////// Input //////////////// //
@@ -162,6 +163,15 @@ type Verify struct {
 	//VerifyChar    string `flag:"vC" errorcode:"13003"`
 }
 
+type Randomness struct {
+	InRow     int
+	Triggers  string
+	Whitelist string
+	Blacklist string
+	Spaces    string
+	Regex     string
+}
+
 func NewOptions() *Options {
 	opt := &Options{}
 	opt.paramRules = make(map[string]parameter.QueryRules)
@@ -266,6 +276,13 @@ func NewOptions() *Options {
 	flag.BoolVar(&opt.NoDisplay, "no-display", false, "Do not display result to screen")
 	flag.BoolVar(&opt.ShowConfig, "show-config", false, "Display all configured parses and their values before the process starts")
 
+	//- [ Randomness ] -
+	/* flag.IntVar(&opt.Randomness.InRow, "random-inrow", 3, "The amount of triggers that need to be in a row for a string to be seen as random in a HTTP response")
+	flag.StringVar(&opt.Randomness.Triggers, "random-trigger", "consonant,digit", "The triggers that is used to detect randomness."+support_format("consonant,digit,vocal"))
+	flag.StringVar(&opt.Randomness.Blacklist, "random-blacklist", "", "A blacklist of keywords to detec randomness in HTTP responses, *separated by comma*")
+	flag.StringVar(&opt.Randomness.Whitelist, "random-whitelist", "", "A whitelist of keywords to detec randomness in HTTP responses, *separated by comma*")
+	flag.StringVar(&opt.Randomness.Regex, "random-regex", "", "Regex to detect randomness in HTTP responses")
+	*/
 	//- [ Debug ] -
 	flag.BoolVar(&opt.Verbose, "v", false, "Display Verbose")
 
