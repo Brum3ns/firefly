@@ -8,6 +8,7 @@ import (
 	"github.com/Brum3ns/firefly/pkg/extract"
 	"github.com/Brum3ns/firefly/pkg/filter"
 	"github.com/Brum3ns/firefly/pkg/payloads"
+	"github.com/Brum3ns/firefly/pkg/randomness"
 	"github.com/Brum3ns/firefly/pkg/transformation"
 )
 
@@ -27,6 +28,7 @@ type Scanner struct {
 	DisablesTechniques bool
 	Extract            extract.Extract
 	Transformation     transformation.Transformation
+	Randomness         randomness.Randomness
 	//Difference         difference.Difference//<-Not needed ATM
 }
 
@@ -71,6 +73,7 @@ func (conf *Configure) newScanner() *Scanner {
 	wlPtn, wlRegex := extract.MakeWordlists(global.DIR_DETECTION)
 	wlPatternPrefix, wlPatterns := extract.CreatePrefixMap(wlPtn)
 
+	// Configure the transformation structure
 	transform, err := transformation.NewTransformation(conf.TransformationYAMLFile)
 	if err != nil {
 		log.Fatal(err)
@@ -89,6 +92,8 @@ func (conf *Configure) newScanner() *Scanner {
 			WordlistRegex:   map[string][]string{extract.WILDCARD: wlRegex},
 		}),
 		Transformation: transform,
+
+		Randomness: randomness.NewRandomness(randomness.DefaultConfig()),
 
 		//Difference: *difference.NewDifference(difference.Properties{}),//<-Not needed ATM
 	}
