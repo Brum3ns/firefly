@@ -35,7 +35,7 @@ launch.json
 **/*.bakup
 **/*_bakup
 **/*_bak
-**/*test
-**/*tests
+#**/*test
+#**/*tests
 **/*vscode
 **/*svn
