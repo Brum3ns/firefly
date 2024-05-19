@@ -48,11 +48,11 @@ type Result struct {
 }
 
 // Start the handler for the workers by giving the tasks to preform and the amount of workers.
-func NewHandler(properties Config) Handler {
+func NewHandler(config Config) Handler {
 	return Handler{
-		Config:   properties,
+		Config:   config,
 		JobQueue: make(chan Job),
-		Pool:     make(chan chan Job, properties.Threads),
+		Pool:     make(chan chan Job, config.Threads),
 	}
 }
 

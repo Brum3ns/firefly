@@ -8,12 +8,13 @@ import (
 )
 
 type Difference struct {
-	*Settings
+	*Config
 }
 
-type Settings struct {
+type Config struct {
 	Payload       string
 	PayloadVerify string
+	Randomness    randomness.Randomness
 	Compare
 }
 
@@ -58,9 +59,9 @@ type diffNode struct {
 	data            map[string]int
 }
 
-func NewDifference(settings Settings) *Difference {
+func NewDifference(config Config) *Difference {
 	return &Difference{
-		Settings: &settings,
+		Config: &config,
 	}
 }
 
@@ -91,18 +92,18 @@ func (diff *Difference) GetHTMLNodeDiff(htmlNode httpprepare.HTMLNode) HTMLResul
 		{data: htmlNode.AttributeValue, checkRandomness: true},
 	}
 	known := [7]map[string][]int{
-		diff.Settings.Compare.HTMLMergeNode.TagStart,
-		diff.Settings.Compare.HTMLMergeNode.TagEnd,
-		diff.Settings.Compare.HTMLMergeNode.TagSelfClose,
-		diff.Settings.Compare.HTMLMergeNode.Words,
-		diff.Settings.Compare.HTMLMergeNode.Comment,
-		diff.Settings.Compare.HTMLMergeNode.Attribute,
-		diff.Settings.Compare.HTMLMergeNode.AttributeValue,
+		diff.Config.Compare.HTMLMergeNode.TagStart,
+		diff.Config.Compare.HTMLMergeNode.TagEnd,
+		diff.Config.Compare.HTMLMergeNode.TagSelfClose,
+		diff.Config.Compare.HTMLMergeNode.Words,
+		diff.Config.Compare.HTMLMergeNode.Comment,
+		diff.Config.Compare.HTMLMergeNode.Attribute,
+		diff.Config.Compare.HTMLMergeNode.AttributeValue,
 	}
 
 	for i := 0; i < len(current); i++ {
 		//Detect difference
-		diffAppear, diffDisappear := nodeDiff(current[i], known[i], diff.Payload)
+		diffAppear, diffDisappear := diff.nodeDiff(current[i], known[i], diff.Payload)
 
 		storage.appear = append(storage.appear, diffAppear)
 		storage.appearHits += diffAppear.hit
@@ -204,7 +205,7 @@ func (diff *Difference) GetHeadersDiff(HeaderNode httpprepare.Header) HeaderResu
 	}
 }
 
-func nodeDiff(current diffNode, known map[string][]int, payload string) (diffNode, diffNode) {
+func (diff *Difference) nodeDiff(current diffNode, known map[string][]int, payload string) (diffNode, diffNode) {
 	var (
 		appear      = newDiffNode()
 		disappear   = newDiffNode()
@@ -239,7 +240,7 @@ func nodeDiff(current diffNode, known map[string][]int, payload string) (diffNod
 
 		if isDiff && currentItem != payload {
 			// Check randomness (false positive)
-			if !current.checkRandomness || (current.checkRandomness && !randomness.IsRandom(currentItem, true)) {
+			if !current.checkRandomness || (current.checkRandomness && !diff.Config.Randomness.IsRandom(currentItem)) {
 				appear.data[currentItem] = amountDiff
 				appear.hit += amountDiff
 			}
@@ -250,7 +251,7 @@ func nodeDiff(current diffNode, known map[string][]int, payload string) (diffNod
 	for knownItem, knownValues := range known {
 		if _, ok := testedItems[knownItem]; !ok {
 			// Check randomness (false positive)
-			if !current.checkRandomness || (current.checkRandomness && !randomness.IsRandom(knownItem, true)) {
+			if !current.checkRandomness || (current.checkRandomness && !diff.Config.Randomness.IsRandom(knownItem)) {
 				value := highestLstIntValue(knownValues)
 				disappear.data[knownItem] = value
 				disappear.hit += value

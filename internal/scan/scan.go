@@ -150,13 +150,14 @@ func (s scan) Extract(job Job) extract.Result {
 func (s scan) Difference(job Job) httpdiff.Result {
 	//Make a new difference instant and provided the current HTTP response body and headers:
 	diff := httpdiff.NewDifference(
-		httpdiff.Settings{
+		httpdiff.Config{
 			Payload:       job.Http.Payload,
 			PayloadVerify: job.Knowledge.PayloadVerify,
 			Compare: httpdiff.Compare{
 				HTMLMergeNode:   job.Knowledge.Combine.HTMLNode,
 				HeaderMergeNode: job.Knowledge.Combine.HeaderNode,
 			},
+			Randomness: s.Scanner.Randomness,
 		},
 	)
 
