@@ -148,7 +148,7 @@ func (conf *configure) ThreadsExtract() bool {
 	return conf.opt.ThreadsExtract >= 0
 }
 func (conf *configure) VerifyAmount() bool {
-	return conf.opt.VerifyAmount >= 0
+	return conf.opt.VerifyAmount > 0
 }
 func (conf *configure) WordlistPaths() bool {
 	return len(conf.opt.wordlistPath) > 0 && len(conf.opt.WordlistPaths) > 0
