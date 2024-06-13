@@ -169,7 +169,7 @@ func makeResult(pResult scanResult) Result {
 				WordCount:     resp.WordCount,
 				LineCount:     resp.LineCount,
 				ContentType:   resp.ContentType,
-				ContentLength: resp.ContentLength,
+				ContentLength: resp.ResponseBodySize,
 				HeaderAmount:  resp.HeaderAmount,
 				Headers:       resp.Header,
 			},

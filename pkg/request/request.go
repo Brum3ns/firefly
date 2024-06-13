@@ -35,17 +35,17 @@ type Result struct {
 }
 
 type Response struct {
-	Time            float64
-	WordCount       int
-	LineCount       int
-	HeaderAmount    int
-	ContentLength   int
-	ContentType     string
-	Title           string
-	Body            string
-	HeaderString    string
-	IPAddress       []string
-	HeadersOriginal [][2]string
+	Time             float64
+	WordCount        int
+	LineCount        int
+	HeaderAmount     int
+	ResponseBodySize int
+	ContentType      string
+	Title            string
+	Body             string
+	HeaderString     string
+	IPAddress        []string
+	HeadersOriginal  [][2]string
 	http.Response
 }
 
@@ -153,17 +153,17 @@ func Request(client *http.Client, requestSettings RequestSettings) Result {
 			Request:         *httpRequest,
 		},
 		Response: Response{
-			IPAddress:     GetIPAddresses(response.Request.URL.Hostname()),
-			HeaderString:  headersToStr(response.Header),
-			Title:         GetHTMLTitle(bodyString),
-			ContentType:   response.Header.Get("content-type"),
-			ContentLength: len(bodyString),
-			HeaderAmount:  len(response.Header),
-			Time:          responseTime,
-			LineCount:     len(strings.Split(bodyString, "\n")),
-			WordCount:     len(strings.Fields(bodyString)),
-			Body:          bodyString,
-			Response:      *response,
+			IPAddress:        GetIPAddresses(response.Request.URL.Hostname()),
+			HeaderString:     headersToStr(response.Header),
+			Title:            GetHTMLTitle(bodyString),
+			ContentType:      response.Header.Get("content-type"),
+			ResponseBodySize: len(bodyString),
+			HeaderAmount:     len(response.Header),
+			Time:             responseTime,
+			LineCount:        len(strings.Split(bodyString, "\n")),
+			WordCount:        len(strings.Fields(bodyString)),
+			Body:             bodyString,
+			Response:         *response,
 		},
 	}
 }
@@ -294,4 +294,13 @@ func MakeHash(Url, method string) string {
 func GetRawQuery(Url string) (string, error) {
 	u, err := url.Parse(Url)
 	return u.RawQuery, err
+}
+
+// Take a string list or map and convert it the http.Header
+func LstToHeaders(m map[string]string) http.Header {
+	var header = http.Header{}
+	for k, v := range m {
+		header.Add(k, v)
+	}
+	return header
 }
