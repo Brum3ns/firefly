@@ -2,6 +2,16 @@
 $title = "Firefly testserver";
 $desc = "dynamic black box testing";
 
+function randomStr($length) {
+    $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $charactersLength = strlen($characters);
+    $randomString = '';
+    for ($i = 0; $i < $length; $i++) {
+        $randomString .= $characters[random_int(0, $charactersLength - 1)];
+    }
+    return $randomString;
+}
+
 // CRLF
 if ( isset($_GET['crlf']) ) {
     $crlf =  $_GET['crlf'];
@@ -22,6 +32,25 @@ if ( isset($_GET['crlf']) ) {
 function xss() {}
 
 function ssti() {}
+
+function reflect() {
+    if ( isset($_GET['reflect']) ) {
+        return "Reflect" . $_GET['reflect'];
+    }
+    return "reflect parameter is missing";
+}
+
+function randomness() {
+    /*
+    CSRF ~ 16-32 bytes
+    SESSIONS ~ 32 bytes
+    */
+
+    if ( isset($_GET['randomness']) ) {
+        return randomStr(16);
+    }
+    return "";
+}
 
 function disappear() {}
     if ( isset($_GET['disappear']) ) {
@@ -60,13 +89,16 @@ function disappear() {}
 <div class="transformation">
 </div>
 
-<!-- dynamic content -->
-<div class="dynamic">
-
-</div>
-
 <div class="disappear">
     <?= disappear() ?>
+</div>
+
+<div class="reflect">
+    <?= reflect() ?>
+</div>
+
+<div class="randomness">
+    <?= randomness() ?>
 </div>
 
 <body>

@@ -2,33 +2,39 @@ package tests
 
 import (
 	"fmt"
+	"log"
 	"testing"
 
 	"github.com/Brum3ns/firefly/pkg/random"
 	"github.com/Brum3ns/firefly/pkg/randomness"
 )
 
-func main() {
-
-	// Check randomness detection accuracy
-	Test_RandomnessAccuracy(&testing.T{})
-}
-
 func Test_RandomnessAccuracy(t *testing.T) {
+	// Config
+	var (
+		amountToTest         = 100
+		lengthOfRandomString = 16
+	)
+
 	//defaultConfig := randomness.DefaultConfig()
 	config := randomness.Config{
-		InRow:     randomness.DEFAULT_INROW,
-		Vocal:     randomness.DEFAULT_VOCAL,
-		Digit:     randomness.DEFAULT_DIGIT,
-		Consonant: randomness.DEFAULT_CONSONANT,
-		Spaces:    []rune{' ', '_', '-', '.'},
+		InRow:      randomness.DEFAULT_INROW,
+		Vocal:      randomness.DEFAULT_VOCAL,
+		Digit:      randomness.DEFAULT_DIGIT,
+		Consonant:  randomness.DEFAULT_CONSONANT,
+		Blacklist:  randomness.DEFAULT_BLACKLISTS,
+		BlackRegex: randomness.DEFAULT_BLACKREGEX,
+		Spaces:     []rune{' ', '_', '-', '.'},
 	}
 
 	// Setup randomness config
-	r := randomness.NewRandomness(config)
+	r, err := randomness.NewRandomness(config)
+	if err != nil {
+		log.Println(err)
+	}
 
 	// Config random strings to test
-	lst_random := getRandomStrings(24, 10000)
+	lst_random := getRandomStrings(lengthOfRandomString, amountToTest)
 	// lst_valid := getValidStrings()
 
 	// Check values if they are random
@@ -36,10 +42,10 @@ func Test_RandomnessAccuracy(t *testing.T) {
 	miss := 0
 	for _, i := range lst_random {
 		if r.IsRandom(i) {
-			fmt.Println("RANDOM:", i)
+			//fmt.Println("RANDOM:", i)
 			hit++
 		} else {
-			fmt.Println("NORMAL:", i)
+			//fmt.Println("NORMAL:", i)
 			miss++
 		}
 	}
