@@ -19,6 +19,7 @@ import (
 	"github.com/Brum3ns/firefly/internal/verbose"
 	"github.com/Brum3ns/firefly/pkg/design"
 	"github.com/Brum3ns/firefly/pkg/files"
+	"github.com/Brum3ns/firefly/pkg/httpfilter"
 	"github.com/Brum3ns/firefly/pkg/httpprepare"
 	"github.com/Brum3ns/firefly/pkg/insertpoint"
 	"github.com/Brum3ns/firefly/pkg/payloads"
@@ -62,8 +63,8 @@ func NewRunner(conf *config.Configure, knowledgeStorage map[string]knowledge.Kno
 		Count:          0,
 		Conf:           conf,
 		VerifyMode:     verifyMode,
-		TerminalUIMode: (!verifyMode && conf.TerminalUI),
-		OutputOK:       (len(conf.Output) > 0 && knowledgeStorage != nil),
+		TerminalUIMode: (!verifyMode && conf.Option.TerminalUI),
+		OutputOK:       (len(conf.Option.Output) > 0 && knowledgeStorage != nil),
 		Design:         design.NewDesign(),
 		stats:          statistics.NewStatistic(verifyMode),
 		channel: Channel{
@@ -75,27 +76,27 @@ func NewRunner(conf *config.Configure, knowledgeStorage map[string]knowledge.Kno
 		handler: Handler{
 			// Setup the HTTP handler:
 			HTTP: request.NewHandler(request.HandlerSettings{
-				Delay:      conf.Delay,
-				Threads:    conf.Threads,
+				Delay:      conf.Option.Delay,
+				Threads:    conf.Option.Threads,
 				VerifyMode: verifyMode,
 				Client: request.NewClient(request.ClientSettings{
-					Timeout: conf.Timeout,
-					Proxy:   conf.Proxy,
-					HTTP2:   conf.HTTP2,
+					Timeout: conf.Option.Timeout,
+					Proxy:   conf.Option.Proxy,
+					HTTP2:   conf.Option.HTTP2,
 				}),
 				RequestBase: request.RequestBase{
-					RandomUserAgent:      conf.RandomAgent,
-					HeadersOriginalArray: conf.Headers,
-					PostBody:             conf.PostData,
-					InsertPoint:          conf.InsertKeyword,
+					RandomUserAgent:      conf.Option.RandomAgent,
+					HeadersOriginalArray: conf.Option.Headers,
+					PostBody:             conf.Option.PostData,
+					InsertPoint:          conf.Option.InsertKeyword,
 				},
 			}),
 
 			// Setup the HTTP scanner handler:
 			Scanner: scan.NewHandler(scan.Config{
 				Scanner:       conf.Scanner,
-				Threads:       conf.ThreadsScanner,
-				PayloadVerify: conf.Options.VerifyPayload,
+				Threads:       conf.Option.ThreadsScanner,
+				PayloadVerify: conf.Option.VerifyPayload,
 				Knowledge:     knowledgeStorage,
 			}),
 		},
@@ -108,7 +109,7 @@ func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, er
 	var (
 		outputFileWriter = r.MustValidateOutput()
 		learnt           = make(map[string][]knowledge.Learnt)
-		display          = output.NewDisplay(r.Conf.Options.Detail, r.Design)
+		display          = output.NewDisplay(r.Conf.Option.Detail, r.Design)
 		terminalUI       = ui.NewProgram()
 		wg               waitgroup.WaitGroup
 	)
@@ -138,7 +139,7 @@ func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, er
 		for {
 			select {
 			case <-r.channel.Statistic:
-				if !r.Conf.NoDisplay && r.TerminalUIMode {
+				if !r.Conf.Option.NoDisplay && r.TerminalUIMode {
 					terminalUI.Send(r.stats)
 				}
 
@@ -167,7 +168,7 @@ func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, er
 					}
 
 					// Display the final result to the screen (CLI)
-					if !r.Conf.NoDisplay {
+					if !r.Conf.Option.NoDisplay {
 						if r.TerminalUIMode {
 							terminalUI.Send(r.stats)
 							terminalUI.Send(result)
@@ -239,7 +240,18 @@ func (r *Runner) listenerHTTP() {
 		r.stats.Response.UpdateTime(resultHTTP.Response.Time)
 
 		//Filter the HTTP response (if set):
-		if r.Conf.Filter.Run(resultHTTP.Response) {
+		filterResp := httpfilter.Response{
+			Body:         []byte(resultHTTP.Response.Body),
+			StatusCode:   resultHTTP.Response.StatusCode,
+			ResponseSize: resultHTTP.Response.ResponseBodySize,
+			WordCount:    resultHTTP.Response.WordCount,
+			LineCount:    resultHTTP.Response.LineCount,
+			ResponseTime: resultHTTP.Response.Time,
+			Headers:      resultHTTP.Response.Header,
+		}
+
+		// HTTP Filter filter/match (if set)
+		if r.Conf.Httpfilter.Run(filterResp) || (r.Conf.HttpMatch.IsSet() && !r.Conf.HttpMatch.Run(filterResp)) {
 			r.stats.Response.CountFilter()
 			r.channel.Statistic <- true
 			continue
@@ -259,8 +271,8 @@ func (r *Runner) MustValidateOutput() *os.File {
 	)
 	//Create output file and create a file writer (*if output file set*):
 	if r.OutputOK {
-		if !files.FileExist(r.Conf.Output) || r.Conf.Overwrite {
-			fileWriter, err = os.OpenFile(r.Conf.Output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if !files.FileExist(r.Conf.Option.Output) || r.Conf.Option.Overwrite {
+			fileWriter, err = os.OpenFile(r.Conf.Option.Output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 
 			if err != nil {
 				log.Panicln(err)
@@ -272,10 +284,10 @@ func (r *Runner) MustValidateOutput() *os.File {
 				log.Panicln(err)
 			}
 		} else {
-			err = fmt.Errorf("%s The specified output file already exists (\033[33m%s\033[0m), use the overwrite option to overwrite it", design.STATUS.FAIL, r.Conf.Output)
+			err = fmt.Errorf("%s The specified output file already exists (\033[33m%s\033[0m), use the overwrite option to overwrite it", design.STATUS.FAIL, r.Conf.Option.Output)
 			log.Panicln(err)
 		}
-		verbose.Show("Save result to output file: " + r.Conf.Output)
+		verbose.Show("Save result to output file: " + r.Conf.Option.Output)
 	}
 	return fileWriter
 }
@@ -283,12 +295,12 @@ func (r *Runner) MustValidateOutput() *os.File {
 func (r *Runner) jobToHandler(requestHandler *request.Handler) int {
 	var (
 		payloadWordlist = r.Conf.Wordlist.GetAll()
-		headersArray    = r.Conf.Headers
-		postbody        = r.Conf.PostData
+		headersArray    = r.Conf.Option.Headers
+		postbody        = r.Conf.Option.PostData
 		jobAmount       = 0
 	)
-	for hash, host := range r.Conf.Hosts {
-		param := r.Conf.Params[hash]
+	for hash, host := range r.Conf.Option.Hosts {
+		param := r.Conf.Option.Params[hash]
 		rawURL := host.URL
 
 		for _, tag := range payloads.TAGS {
@@ -301,7 +313,7 @@ func (r *Runner) jobToHandler(requestHandler *request.Handler) int {
 			for _, payload := range wordlist {
 				// Prepare the request by inserting the current payload into the request:
 				// !Note : (Some variables given will be modified)
-				insert := insertpoint.NewInsert(r.Conf.InsertKeyword, payload)
+				insert := insertpoint.NewInsert(r.Conf.Option.InsertKeyword, payload)
 
 				URLStruct, _ := url.Parse(rawURL)
 
@@ -329,14 +341,14 @@ func (r *Runner) jobToHandler(requestHandler *request.Handler) int {
 					Tag:          tag,
 					Payload:      payload,
 					URLOriginal:  rawURL,
-					Parameter:    r.Conf.Params[hash],
+					Parameter:    r.Conf.Option.Params[hash],
 					URL:          insert.SetURL(rawURL),
 					Method:       insert.SetMethod(host.Method),
 					RequestBase: request.RequestBase{
 						Headers:              insert.SetHeaders(headersArray),
 						PostBody:             insert.SetPostBody(postbody),
-						RandomUserAgent:      r.Conf.RandomAgent,
-						HeadersOriginalArray: r.Conf.Headers,
+						RandomUserAgent:      r.Conf.Option.RandomAgent,
+						HeadersOriginalArray: r.Conf.Option.Headers,
 					},
 				}
 				jobAmount++

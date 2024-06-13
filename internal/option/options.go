@@ -18,6 +18,7 @@ import (
 	"github.com/Brum3ns/firefly/internal/version"
 	"github.com/Brum3ns/firefly/pkg/design"
 	"github.com/Brum3ns/firefly/pkg/files"
+	"github.com/Brum3ns/firefly/pkg/functions"
 	"github.com/Brum3ns/firefly/pkg/parameter"
 	"github.com/Brum3ns/firefly/pkg/request"
 	"golang.org/x/exp/slices"
@@ -66,7 +67,7 @@ type Filter struct {
 	MatchTime                     string `flag:"mt" errorcode:"3006"`
 	MatchBodyRegex                string `flag:"mr" errorcode:"3007"`
 	MatchHeaderRegex              string `flag:"mh" errorcode:"3008"`
-	MatchHeaderAmount             string `flag:"mH" errorcode:"3009"`
+	MatchHeader                   string `flag:"mH" errorcode:"3009"`
 	FilterMode/*(OR|AND)*/ string        `flag:"fmode" errorcode:"3010"`
 	FilterCode                    string `flag:"fc" errorcode:"3011"`
 	FilterLine                    string `flag:"fs" errorcode:"3012"`
@@ -75,7 +76,9 @@ type Filter struct {
 	FilterTime                    string `flag:"ft" errorcode:"3015"`
 	FilterBodyRegex               string `flag:"fr" errorcode:"3016"`
 	FilterHeaderRegex             string `flag:"fh" errorcode:"3017"`
-	FilterHeaderAmount            string `flag:"fH" errorcode:"3018"`
+	FilterHeader                  string `flag:"fH" errorcode:"3018"`
+
+	FilterDiffHeader string `flag:"sH" errorcode:"3019"`
 }
 
 // ////////////// Output //////////////// //
@@ -127,7 +130,6 @@ type Request struct {
 	Proxy        string                          `flag:"proxy" errorcode:"10004"`
 	PostData     string                          `flag:"d" errorcode:"10006"`
 	UserAgent    string                          `flag:"ua" errorcode:"10007"`
-	SkipHeaders  string                          `flag:"sH" errorcode:"10008"`
 	Delay        int                             `flag:"delay" errorcode:"10011"`
 	Timeout      int                             `flag:"timeout" errorcode:"10012"`
 	HTTP2        bool                            `flag:"timeout" errorcode:"10010"`
@@ -247,7 +249,7 @@ func NewOptions() *Options {
 	flag.StringVar(&opt.MatchTime, "mt", "", "Match response time")
 	flag.StringVar(&opt.MatchBodyRegex, "mr", "", "Match body regex (RE2)")
 	flag.StringVar(&opt.MatchHeaderRegex, "mh", "", "Match header regex (RE2)")
-	flag.StringVar(&opt.MatchHeaderAmount, "mH", "", "Match header amount")
+	flag.StringVar(&opt.MatchHeader, "mH", "", "Match headers")
 
 	//- [ Filter ] -
 	flag.StringVar(&opt.FilterMode, "fmode", "or", "Filter mode (AND|OR)")
@@ -258,7 +260,10 @@ func NewOptions() *Options {
 	flag.StringVar(&opt.FilterTime, "ft", "", "Filter response time")
 	flag.StringVar(&opt.FilterBodyRegex, "fr", "", "Filter body regex (RE2)")
 	flag.StringVar(&opt.FilterHeaderRegex, "fh", "", "Filter header regex (RE2)")
-	flag.StringVar(&opt.FilterHeaderAmount, "fH", "", "Filter header amount")
+	flag.StringVar(&opt.FilterHeader, "fH", "", "Filter headers")
+
+	// - [ Filter difference ]
+	flag.StringVar(&opt.FilterDiffHeader, "fdh", global.FILE_SKIP_HEADERS, "Headers to ignore if they are a difference in the HTTP response separated by comma or as a wordlist file")
 
 	//- [ Preformance ] -
 	flag.IntVar(&opt.Timeout, "timeout", 11, "Timeout in secounds before giving up on the response")
@@ -464,7 +469,7 @@ func (opt *Options) setMethods(s string) error {
 }
 
 func (opt *Options) setURLs_NoScheme(s string) error {
-	for _, u := range splitEscape(s, ',') {
+	for _, u := range functions.SplitEscape(s, ',') {
 		//Delete the HTTP scheme in the URL (if any)
 		if scheme := request.ContainScheme(u); scheme != "" {
 			u = strings.Replace(u, (scheme + "://"), "", 1)
@@ -500,7 +505,7 @@ func (opt *Options) setScheme(s string) error {
 // Set headers that will be used within all future request
 // !Note : (all header names will be in transformed to lowercase)
 func (opt *Options) setHeaders(s string) error {
-	for _, headers := range splitEscape(s, ',') {
+	for _, headers := range functions.SplitEscape(s, ',') {
 		if h := strings.SplitN(strings.TrimSpace(headers), ":", 2); len(h) == 2 {
 			headerName := strings.ToLower(h[0])
 			headerValue := h[1]
@@ -637,10 +642,10 @@ func (opt *Options) makeParams() error {
 
 func (opt *Options) setAutoParamRules(s string) error {
 	var err error
-	for _, paramRule := range splitEscape(s, ',') {
+	for _, paramRule := range functions.SplitEscape(s, ',') {
 		paramRule = strings.ToLower(paramRule)
 
-		if lst := splitEscape(paramRule, ':'); len(lst) == 2 || len(lst) == 3 {
+		if lst := functions.SplitEscape(paramRule, ':'); len(lst) == 2 || len(lst) == 3 {
 			var ( //Extracted part of definitions from the core input value:
 				position   = lst[0]
 				method     = lst[1]
@@ -743,33 +748,6 @@ func support_autoParameters() string {
 
 func support_format(s string) string {
 	return fmt.Sprintf("Format: (\033[1;33m%s\033[0m)", s)
-}
-
-// Split a string by comma but ignore escaped comma characters (\,) to be splitted.
-// Return a string based list of all the items.
-func splitEscape(s string, sep rune) []string {
-	var (
-		l   []string
-		str string
-	)
-	for idx, r := range s {
-		if len(s) >= 2 && r == sep {
-			if s[idx-1] != '\\' {
-				l = append(l, str)
-				str = ""
-				continue
-
-			} else if s[idx-1] == '\\' {
-				str = str[:len(str)-1]
-			}
-		}
-		str += string(r)
-
-		if idx == len(s)-1 {
-			l = append(l, str)
-		}
-	}
-	return l
 }
 
 func exampleValues(s string) string {
