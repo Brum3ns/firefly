@@ -158,6 +158,7 @@ func (s scan) Difference(job Job) httpdiff.Result {
 				HeaderMergeNode: job.Knowledge.Combine.HeaderNode,
 			},
 			Randomness: s.Scanner.Randomness,
+			Filter:     s.Scanner.HttpDiffFilter,
 		},
 	)
 

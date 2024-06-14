@@ -78,7 +78,8 @@ type Filter struct {
 	FilterHeaderRegex             string `flag:"fh" errorcode:"3017"`
 	FilterHeader                  string `flag:"fH" errorcode:"3018"`
 
-	FilterDiffHeader string `flag:"sH" errorcode:"3019"`
+	filterDiffHeader string   `flag:"fdH" errorcode:"3019"`
+	FilterDiffHeader []string `flag:"fdH" errorcode:"3019"`
 }
 
 // ////////////// Output //////////////// //
@@ -262,8 +263,8 @@ func NewOptions() *Options {
 	flag.StringVar(&opt.FilterHeaderRegex, "fh", "", "Filter header regex (RE2)")
 	flag.StringVar(&opt.FilterHeader, "fH", "", "Filter headers")
 
-	// - [ Filter difference ]
-	flag.StringVar(&opt.FilterDiffHeader, "fdh", global.FILE_SKIP_HEADERS, "Headers to ignore if they are a difference in the HTTP response separated by comma or as a wordlist file")
+	//- [ FIlter diff ] -
+	flag.StringVar(&opt.filterDiffHeader, "fdH", global.FILE_SKIP_HEADERS, "Headers to ignore if they are a difference in the HTTP response separated by comma or as a wordlist file (if you want to keep the default wordlist, you can add the keyword 'DEFAULT')")
 
 	//- [ Preformance ] -
 	flag.IntVar(&opt.Timeout, "timeout", 11, "Timeout in secounds before giving up on the response")
@@ -328,6 +329,11 @@ func NewOptions() *Options {
 	//Read input from pipeline STDIN:
 	if err := opt.readStdin(); err != nil {
 		log.Fatalf("Invalid stdin was given: %s", err)
+	}
+
+	// Setup the filter diff headers
+	if err := opt.makeFilterDiffHeader(); err != nil {
+		log.Fatal(err)
 	}
 
 	//Setup the parameter object for each supported position within the HTTP request
@@ -451,6 +457,31 @@ func (opt *Options) makeURLs() error {
 	return nil
 }
 
+func (opt *Options) makeFilterDiffHeader() error {
+	for _, i := range functions.SplitEscape(opt.filterDiffHeader, ',') {
+		// Detected that the default wordlist should be included too
+		if i == "DEFAULT" {
+			i = global.FILE_SKIP_HEADERS
+		}
+
+		typ, err := files.FileOrFolder(i)
+		if typ == "file" && err == nil {
+			if lst, err := files.FileToList(i); err == nil {
+				opt.FilterDiffHeader = append(opt.FilterDiffHeader, lst...)
+			} else {
+				return err
+			}
+
+		} else if typ == "folder" && err == nil {
+			// Code...
+
+		} else {
+			opt.FilterDiffHeader = append(opt.FilterDiffHeader, i)
+		}
+	}
+	return nil
+}
+
 // Set HTTP Method(s) to be used within all future requests.
 // all : preform all supported (*golang http package*) HTTP methods except DELETE
 // all,delete : same as 'all' but include the DELETE method
@@ -468,6 +499,7 @@ func (opt *Options) setMethods(s string) error {
 	return nil
 }
 
+// Set URLs without HTTP scheme
 func (opt *Options) setURLs_NoScheme(s string) error {
 	for _, u := range functions.SplitEscape(s, ',') {
 		//Delete the HTTP scheme in the URL (if any)

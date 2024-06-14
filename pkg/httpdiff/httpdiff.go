@@ -15,6 +15,7 @@ type Config struct {
 	Payload       string
 	PayloadVerify string
 	Randomness    randomness.Randomness
+	Filter
 	Compare
 }
 
@@ -51,6 +52,14 @@ type HTMLNodeDiff struct {
 	AttributeHits      int
 	AttributeValueHits int
 	httpprepare.HTMLNode
+}
+type Filter struct {
+	HeaderFilter
+	//HTMLFilter
+}
+
+type HeaderFilter struct {
+	Header httpprepare.Header
 }
 
 type diffNode struct {
@@ -166,6 +175,10 @@ func (diff *Difference) GetHeadersDiff(HeaderNode httpprepare.Header) HeaderResu
 	)
 
 	for currentHeader, currentHeaderData := range HeaderNode {
+		// Diff Filter check
+		if diff.FilterHeader(currentHeader) {
+			continue
+		}
 
 		// Check if the information is unique in relation to the shared header names
 		if knownHeaderData, ok := diff.Compare.HeaderMergeNode[currentHeader]; ok {
@@ -187,6 +200,11 @@ func (diff *Difference) GetHeadersDiff(HeaderNode httpprepare.Header) HeaderResu
 
 	// Add headers that disappear in the current response compare to the original
 	for knownHeader, knownHeaderData := range diff.Compare.HeaderMergeNode {
+		// Diff Filter check
+		if diff.FilterHeader(knownHeader) {
+			continue
+		}
+
 		if _, ok := testedItems[knownHeader]; !ok {
 			// Extract the highest difference from the known values and add it
 			disappear[knownHeader] = httpprepare.HeaderInfo{
@@ -259,6 +277,16 @@ func (diff *Difference) nodeDiff(current diffNode, known map[string][]int, paylo
 		}
 	}
 	return appear, disappear
+}
+
+// Filter HTTP header name
+func (diff *Difference) FilterHeader(header string /*value string*/) bool {
+	if len(diff.Filter.HeaderFilter.Header) == 0 {
+		return false
+	}
+	_, ok := diff.Filter.HeaderFilter.Header[header]
+
+	return ok
 }
 
 func highestLstIntValue(lst []int) int {

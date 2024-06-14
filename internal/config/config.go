@@ -7,7 +7,9 @@ import (
 	"github.com/Brum3ns/firefly/internal/option"
 	"github.com/Brum3ns/firefly/pkg/extract"
 	"github.com/Brum3ns/firefly/pkg/functions"
+	"github.com/Brum3ns/firefly/pkg/httpdiff"
 	"github.com/Brum3ns/firefly/pkg/httpfilter"
+	"github.com/Brum3ns/firefly/pkg/httpprepare"
 	"github.com/Brum3ns/firefly/pkg/payloads"
 	"github.com/Brum3ns/firefly/pkg/randomness"
 	"github.com/Brum3ns/firefly/pkg/request"
@@ -32,7 +34,7 @@ type Scanner struct {
 	Extract            extract.Extract
 	Transformation     transformation.Transformation
 	Randomness         randomness.Randomness
-	HttpDiffFilter     httpfilter.Filter
+	HttpDiffFilter     httpdiff.Filter
 }
 
 func NewConfigure(opt *option.Options) (*Configure, error) {
@@ -123,31 +125,25 @@ func (conf *Configure) newScanner() (*Scanner, error) {
 		return &Scanner{}, err
 	}
 
-	// Configure HTTP difference filter
-	httpDiffFilter, err := httpfilter.NewFilter(httpfilter.Config{
-		Header: request.LstToHeaders(LstToKeyMap(functions.SplitEscape(conf.Option.FilterDiffHeader, ','))),
-	})
-	if err != nil {
-		return &Scanner{}, err
-	}
-
 	return &Scanner{
 		OK_Extract:         conf.Option.Techniques["E"],
 		OK_Diff:            conf.Option.Techniques["D"],
 		OK_Transformation:  conf.Option.Techniques["T"],
 		DisablesTechniques: conf.Option.Techniques["X"],
 
+		Randomness:     rand,
+		Transformation: transform,
 		Extract: extract.NewExtract(extract.Properties{
 			Threads:         conf.Option.ThreadsExtract,
 			PrefixPatterns:  wlPatternPrefix,
 			WordlistPattern: wlPatterns,
 			WordlistRegex:   map[string][]string{extract.WILDCARD: wlRegex},
 		}),
-		Transformation: transform,
-		Randomness:     rand,
-		HttpDiffFilter: httpDiffFilter,
-
-		//Difference: *difference.NewDifference(difference.Properties{}),//<-Not needed ATM
+		HttpDiffFilter: httpdiff.Filter{
+			HeaderFilter: httpdiff.HeaderFilter{
+				Header: httpprepare.GetHeaderNode(request.LstToHeaders(LstToKeyMap(conf.Option.FilterDiffHeader))),
+			},
+		},
 	}, nil
 }
 
