@@ -23,11 +23,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	//Configure needed resources
+	//Setup user arguments (options)
 	opt := option.NewOptions()
-	conf := config.NewConfigure(opt)
 
-	if !conf.TerminalUI {
+	// Configure user arguments (options)
+	conf, err := config.NewConfigure(opt)
+	if err != nil {
+		log.Fatal(design.STATUS.ERROR, err)
+	}
+
+	if !conf.Option.TerminalUI {
 		banner.Banner()
 		banner.Disclaimer()
 	}
