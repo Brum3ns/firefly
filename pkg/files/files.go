@@ -3,7 +3,6 @@ package files
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -60,27 +59,46 @@ func CreateFolder(name string) {
 	}
 }
 
-// Take a file and convert it's data to a given map
-func FileToMap(file string) map[string]int {
-	m := make(map[string]int)
+// Take a file and convert it's data to a given string list
+func FileToList(file string) ([]string, error) {
+	var lst []string
 
 	//Open the file and check for errors:
 	f, err := os.Open(file)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return lst, err
 	}
-	defer f.Close()
 	scanner := bufio.NewScanner(f)
 
 	//Read the file items and add it to map:
 	for scanner.Scan() {
-		item := scanner.Text()
-		if item != "" {
+		if item := scanner.Text(); item != "" {
+			lst = append(lst, item)
+		}
+	}
+	f.Close()
+	return lst, nil
+}
+
+// Take a file and convert it's data to a given string map
+func FileToMap(file string) (map[string]int, error) {
+	var m = make(map[string]int)
+
+	//Open the file and check for errors:
+	f, err := os.Open(file)
+	if err != nil {
+		return m, err
+	}
+	scanner := bufio.NewScanner(f)
+
+	//Read the file items and add it to map:
+	for scanner.Scan() {
+		if item := scanner.Text(); item != "" {
 			m[item] += 1
 		}
 	}
-	return m
+	f.Close()
+	return m, nil
 }
 
 // Check file size
@@ -92,6 +110,8 @@ func FileSize(f string) (int, error) {
 	return int(fInfo.Size()), nil
 }
 
+// Check if the given value is a valid file or folder
+// Return a string of "file" if it's a file and "folder" if it's a folder
 func FileOrFolder(f string) (string, error) {
 	finfo, err := os.Stat(f)
 	switch {
