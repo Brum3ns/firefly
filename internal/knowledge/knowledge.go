@@ -6,13 +6,15 @@ import (
 	"github.com/Brum3ns/firefly/internal/output"
 	"github.com/Brum3ns/firefly/pkg/extract"
 	"github.com/Brum3ns/firefly/pkg/httpprepare"
+	"github.com/Brum3ns/firefly/pkg/httpreflect"
 )
 
 type Knowledge struct {
-	PayloadVerify string
-	Responses     []output.Response
-	Requests      []output.Request
-	Combine       Combine
+	PayloadVerify           string
+	Responses               []output.Response
+	Requests                []output.Request
+	HttpReflectSurroundings []httpreflect.Surrounding
+	Combine                 Combine
 }
 
 type Combine struct {
@@ -22,11 +24,12 @@ type Combine struct {
 }
 
 type Learnt struct {
-	Payload  string
-	HTMLNode httpprepare.HTMLNode
-	Extract  extract.Result
-	Response output.Response
-	Request  output.Request
+	Payload                 string
+	HTMLNode                httpprepare.HTMLNode
+	Extract                 extract.Result
+	Response                output.Response
+	Request                 output.Request
+	HttpReflectSurroundings []httpreflect.Surrounding
 }
 
 func NewKnowledge() *Knowledge {
@@ -51,6 +54,7 @@ func GetKnowledge(learnt map[string][]Learnt) map[string]Knowledge {
 			k.PayloadVerify = d.Payload
 			k.Requests = append(k.Requests, d.Request)
 			k.Responses = append(k.Responses, d.Response)
+			k.HttpReflectSurroundings = httpreflect.MergeUniqueSurroundings(k.HttpReflectSurroundings, d.HttpReflectSurroundings)
 
 			k.Combine.HeaderNode = c.HeaderNode.Merge(d.Response.Headers)
 			k.Combine.Extract = combineAppendMaps(reflect.ValueOf(&c.Extract), d.Extract).(extract.ResultCombine)

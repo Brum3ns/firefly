@@ -8,6 +8,7 @@ import (
 	"github.com/Brum3ns/firefly/pkg/extract"
 	"github.com/Brum3ns/firefly/pkg/httpdiff"
 	"github.com/Brum3ns/firefly/pkg/httpprepare"
+	"github.com/Brum3ns/firefly/pkg/httpreflect"
 	"github.com/Brum3ns/firefly/pkg/request"
 	"github.com/Brum3ns/firefly/pkg/transformation"
 )
@@ -22,11 +23,13 @@ type scan struct {
 }
 
 type scanResult struct {
-	UnkownBehavior bool
-	Http           request.Result
-	Extract        extract.Result
-	Difference     httpdiff.Result
-	Transformation transformation.Result
+	UnkownBehavior          bool
+	Http                    request.Result
+	Extract                 extract.Result
+	Difference              httpdiff.Result
+	Transformation          transformation.Result
+	HttpReflectSurroundings []httpreflect.Surrounding
+	HttpReflectExtracts     []string
 }
 
 // Create a new scan
@@ -71,6 +74,8 @@ func (s scan) scan(job Job) scanResult {
 		behavior.status = behavior.QuickDetect(job)
 	}
 
+	httpReflectExtracts, httpReflectSurroundings := s.Reflectation(job)
+
 	//Check if we should preform scanner techniques or not:
 	if !s.Scanner.DisablesTechniques {
 
@@ -91,12 +96,32 @@ func (s scan) scan(job Job) scanResult {
 	}
 
 	return scanResult{
-		UnkownBehavior: behavior.status,
-		Http:           job.Http,
-		Extract:        ResultExtract,
-		Difference:     ResultDifference,
-		Transformation: ResultTransformation,
+		UnkownBehavior:          behavior.status,
+		Http:                    job.Http,
+		Extract:                 ResultExtract,
+		Difference:              ResultDifference,
+		Transformation:          ResultTransformation,
+		HttpReflectExtracts:     httpReflectExtracts,
+		HttpReflectSurroundings: httpReflectSurroundings,
 	}
+}
+
+func (s scan) Reflectation(job Job) ([]string, []httpreflect.Surrounding) {
+	var (
+		extracts     []string
+		surroundings []httpreflect.Surrounding
+	)
+
+	// The Payload is a static canary and the surrounding is needed to be extracted
+	// This process should only be done during the verification process of Firefly
+	if job.Knowledge.PayloadVerify == "" {
+		s.Scanner.HttpReflect.SetCanary(job.Http.Payload)
+		surroundings = s.Scanner.HttpReflect.GetAllCanarySurroundings(job.Http.Response.Body)
+	} else {
+		extracts = s.Scanner.HttpReflect.ExtractAll(job.Http.Response.Body, job.Knowledge.HttpReflectSurroundings)
+	}
+
+	return extracts, surroundings
 }
 
 // Scan for errors, patterns in the response that have been triggered by the payload

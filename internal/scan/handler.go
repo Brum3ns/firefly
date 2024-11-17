@@ -174,10 +174,11 @@ func makeResult(pResult scanResult) Result {
 				Headers:       resp.Header,
 			},
 			Scanner: output.Scanner{
-				Extract:        pResult.Extract,
-				Diff:           pResult.Difference,
-				Transformation: pResult.Transformation,
-				//Data...
+				Extract:                 pResult.Extract,
+				Diff:                    pResult.Difference,
+				Transformation:          pResult.Transformation,
+				HttpReflectExtracts:     pResult.HttpReflectExtracts,
+				HttpReflectSurroundings: pResult.HttpReflectSurroundings,
 			},
 
 			Error: nil,

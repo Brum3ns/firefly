@@ -149,10 +149,11 @@ func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, er
 				if r.VerifyMode {
 					mutex.Lock()
 					learnt[result.TargetHashId] = append(learnt[result.TargetHashId], knowledge.Learnt{
-						Payload:  result.Payload,
-						Extract:  result.Scanner.Extract,
-						HTMLNode: httpprepare.GetHTMLNode(result.Response.Body),
-						Response: result.Response,
+						Payload:                 result.Payload,
+						Response:                result.Response,
+						HTMLNode:                httpprepare.GetHTMLNode(result.Response.Body),
+						Extract:                 result.Scanner.Extract,
+						HttpReflectSurroundings: result.Scanner.HttpReflectSurroundings,
 					})
 					mutex.Unlock()
 				} else if result.UnkownBehavior {

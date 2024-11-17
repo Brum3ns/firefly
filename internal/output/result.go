@@ -5,6 +5,7 @@ import (
 
 	"github.com/Brum3ns/firefly/pkg/extract"
 	"github.com/Brum3ns/firefly/pkg/httpdiff"
+	"github.com/Brum3ns/firefly/pkg/httpreflect"
 	"github.com/Brum3ns/firefly/pkg/transformation"
 )
 
@@ -66,7 +67,9 @@ type Response struct {
 
 // Refer to the results of the scanning process
 type Scanner struct {
-	Extract        extract.Result        `json:"Extract"`
-	Diff           httpdiff.Result       `json:"Diff"`
-	Transformation transformation.Result `json:"Transformation"`
+	Extract                 extract.Result            `json:"Extract"`
+	Diff                    httpdiff.Result           `json:"Diff"`
+	Transformation          transformation.Result     `json:"Transformation"`
+	HttpReflectExtracts     []string                  `json:"HttpReflectExtracts"`
+	HttpReflectSurroundings []httpreflect.Surrounding `json:"HttpReflectSurroundings"`
 }
