@@ -154,7 +154,7 @@ func Request(client *http.Client, requestSettings RequestSettings) Result {
 		},
 		Response: Response{
 			IPAddress:        GetIPAddresses(response.Request.URL.Hostname()),
-			HeaderString:     headersToStr(response.Header),
+			HeaderString:     HeadersToString(response.Header),
 			Title:            GetHTMLTitle(bodyString),
 			ContentType:      response.Header.Get("content-type"),
 			ResponseBodySize: len(bodyString),
@@ -236,9 +236,18 @@ func ValidURLOrIP(s string) bool {
 	return err == nil || net.ParseIP(s) != nil
 }
 
-// Convert the *http.Header* to a string (type: "map[string][]string").
-// The converted string version is sorted which makes it easier to compare with others.
-func headersToStr(headers http.Header) string {
+// Convert the *response.Body* to a string
+func ResponseBodyToString(responseBody io.ReadCloser) (string, error) {
+	bodyBytes, err := io.ReadAll(responseBody)
+	if err != nil {
+		log.Println("Could not read the response body:", err)
+		return "", err
+	}
+	return string(bodyBytes), nil
+}
+
+// Convert the *http.Header* to a string
+func HeadersToString(headers http.Header) string {
 	if headers == nil {
 		return ""
 	}
