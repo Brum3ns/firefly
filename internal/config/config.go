@@ -10,6 +10,7 @@ import (
 	"github.com/Brum3ns/firefly/pkg/httpdiff"
 	"github.com/Brum3ns/firefly/pkg/httpfilter"
 	"github.com/Brum3ns/firefly/pkg/httpprepare"
+	"github.com/Brum3ns/firefly/pkg/httpreflect"
 	"github.com/Brum3ns/firefly/pkg/payloads"
 	"github.com/Brum3ns/firefly/pkg/randomness"
 	"github.com/Brum3ns/firefly/pkg/request"
@@ -35,6 +36,7 @@ type Scanner struct {
 	Transformation     transformation.Transformation
 	Randomness         randomness.Randomness
 	HttpDiffFilter     httpdiff.Filter
+	HttpReflect        httpreflect.Reflect
 }
 
 func NewConfigure(opt *option.Options) (*Configure, error) {
@@ -144,6 +146,11 @@ func (conf *Configure) newScanner() (*Scanner, error) {
 				Header: httpprepare.GetHeaderNode(request.LstToHeaders(LstToKeyMap(conf.Option.FilterDiffHeader))),
 			},
 		},
+		HttpReflect: httpreflect.NewReflect(httpreflect.Config{
+			IndexEndLength:   conf.Option.CanaryPrefixSurrounding,
+			IndexStartLength: conf.Option.CanarySuffixSurrounding,
+			Canary:           conf.Option.VerifyPayload,
+		}),
 	}, nil
 }
 
