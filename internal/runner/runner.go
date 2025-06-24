@@ -1,379 +1,267 @@
 package runner
 
 import (
-	"fmt"
-	"io/ioutil"
+	"context"
+	"errors"
 	"log"
-	"net/url"
-	"os"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/Brum3ns/firefly/internal/config"
-	"github.com/Brum3ns/firefly/internal/global"
 	"github.com/Brum3ns/firefly/internal/knowledge"
-	"github.com/Brum3ns/firefly/internal/output"
+	"github.com/Brum3ns/firefly/internal/option"
 	"github.com/Brum3ns/firefly/internal/scan"
-	"github.com/Brum3ns/firefly/internal/ui"
-	"github.com/Brum3ns/firefly/internal/verbose"
-	"github.com/Brum3ns/firefly/pkg/design"
-	"github.com/Brum3ns/firefly/pkg/files"
+	"github.com/panjf2000/ants/v2"
+
 	"github.com/Brum3ns/firefly/pkg/httpfilter"
-	"github.com/Brum3ns/firefly/pkg/httpprepare"
-	"github.com/Brum3ns/firefly/pkg/insertpoint"
-	"github.com/Brum3ns/firefly/pkg/payloads"
-	"github.com/Brum3ns/firefly/pkg/request"
-	"github.com/Brum3ns/firefly/pkg/statistics"
+	"github.com/Brum3ns/firefly/pkg/payload"
+	"github.com/Brum3ns/firefly/pkg/randomness"
+	"github.com/Brum3ns/firefly/pkg/rhttp"
 	"github.com/Brum3ns/firefly/pkg/waitgroup"
+	"github.com/projectdiscovery/rawhttp"
 )
 
-// The runner should contain the structures needed for all the processes.
-// It must NOT contain structures that need to be modified and/or dynamicly changed once the process is running.
+const (
+	mode_knowledge = "knowledge"
+	mode_fuzz      = "fuzz"
+)
+
 type Runner struct {
-	Count          int
-	OutputOK       bool
-	VerifyMode     bool
-	TerminalUIMode bool
-	Conf           *config.Configure
-	Design         *design.Design
-	RequestTasks   *request.TaskStorage
-	stats          statistics.Statistic
-	channel        Channel
-	handler        Handler
+	mode       string
+	wg         waitGroup
+	channel    channel
+	payload    payload.Payload
+	scan       scan.Scan
+	request    rhttp.Http
+	option     option.Option
+	httpfilter httpfilter.Filter
+	httpmatch  httpfilter.Filter
+	randomness randomness.Randomness
+	statistic  Statistic
+	workerpool workerpool
+	knowledge  knowledge.Knowledge
 }
 
-type Handler struct {
-	HTTP    request.Handler
-	Scanner scan.Handler
+type workerpool struct {
+	request *ants.Pool
+	scanner *ants.Pool
 }
 
-type Channel struct {
-	ListenerScanner chan scan.Result
-	ListenerHTTP    chan request.Result
-	Result          chan output.ResultFinal
-	Statistic       chan bool
+type waitGroup struct {
+	process      waitgroup.WaitGroup
+	knowledge    waitgroup.WaitGroup
+	result       waitgroup.WaitGroup
+	scanner      waitgroup.WaitGroup
+	httpRequest  waitgroup.WaitGroup
+	httpResponse waitgroup.WaitGroup
 }
 
-// Setup a new runner. The runner can run in a verification mode, in that case the argument "knowledgeStorage" MUST be set to "nil".
-// The other mode is the attack mode and need the "knowledgeStorage" to contain knowledge (data) about the target to attack to be run successfully.
-func NewRunner(conf *config.Configure, knowledgeStorage map[string]knowledge.Knowledge) *Runner {
-	var verifyMode = (knowledgeStorage == nil)
-	return &Runner{
-		Count:          0,
-		Conf:           conf,
-		VerifyMode:     verifyMode,
-		TerminalUIMode: (!verifyMode && conf.Option.TerminalUI),
-		OutputOK:       (len(conf.Option.Output) > 0 && knowledgeStorage != nil),
-		Design:         design.NewDesign(),
-		stats:          statistics.NewStatistic(verifyMode),
-		channel: Channel{
-			ListenerScanner: make(chan scan.Result),
-			ListenerHTTP:    make(chan request.Result),
-			Result:          make(chan output.ResultFinal),
-			Statistic:       make(chan bool),
-		},
-		handler: Handler{
-			// Setup the HTTP handler:
-			HTTP: request.NewHandler(request.HandlerSettings{
-				Delay:      conf.Option.Delay,
-				Threads:    conf.Option.Threads,
-				VerifyMode: verifyMode,
-				Client: request.NewClient(request.ClientSettings{
-					Timeout: conf.Option.Timeout,
-					Proxy:   conf.Option.Proxy,
-					HTTP2:   conf.Option.HTTP2,
-				}),
-				RequestBase: request.RequestBase{
-					RandomUserAgent:      conf.Option.RandomAgent,
-					HeadersOriginalArray: conf.Option.Headers,
-					PostBody:             conf.Option.PostData,
-					InsertPoint:          conf.Option.InsertKeyword,
-				},
-			}),
+type channel struct {
+	httpRequest  chan jobHTTP
+	scanner      chan jobScanner
+	httpResponse chan jobHTTP
+	knowledge    chan jobScanner
+	result       chan jobScanner
+}
 
-			// Setup the HTTP scanner handler:
-			Scanner: scan.NewHandler(scan.Config{
-				Scanner:       conf.Scanner,
-				Threads:       conf.Option.ThreadsScanner,
-				PayloadVerify: conf.Option.VerifyPayload,
-				Knowledge:     knowledgeStorage,
-			}),
+func NewRunner(opt option.Option) (Runner, error) {
+	var err error
+	var r = Runner{
+		option:    opt,
+		knowledge: knowledge.NewKnowledge(),
+		channel: channel{
+			scanner:      make(chan jobScanner, opt.BufferPoolScanner),
+			httpRequest:  make(chan jobHTTP, opt.BufferPoolRequest),
+			httpResponse: make(chan jobHTTP, opt.BufferPoolRequest),
+			knowledge:    make(chan jobScanner, opt.BufferPoolKnowledge),
+			result:       make(chan jobScanner, opt.BufferPoolResult),
 		},
 	}
-}
 
-// Firefly verify/fuzz runner
-// The runner is the core process for all other child processes. It's preforming the requests and listen for HTTP results to be scanned analyzed.
-func (r *Runner) Run() (map[string]knowledge.Knowledge, statistics.Statistic, error) {
-	var (
-		outputFileWriter = r.MustValidateOutput()
-		learnt           = make(map[string][]knowledge.Learnt)
-		display          = output.NewDisplay(r.Conf.Option.Detail, r.Design)
-		terminalUI       = ui.NewProgram()
-		wg               waitgroup.WaitGroup
-	)
-
-	// Start terminal UI
-	if r.TerminalUIMode {
-		wg.Add(1)
-		go func() {
-			if _, err := terminalUI.Run(); err != nil {
-				log.Fatalf("terminal UI - %s", err)
-			}
-			wg.Done()
-		}()
+	// Set the payload instance
+	if r.payload, err = payload.NewPayload(payload.Config{
+		WordlistFile:  opt.PayloadWordlist,
+		PayloadVerify: opt.PayloadVerify,
+	}); err != nil {
+		return r, err
 	}
 
-	// Start the request and scanner handlers
-	go r.handler.HTTP.Run(r.channel.ListenerHTTP)
-	go r.handler.Scanner.Run(r.channel.ListenerScanner)
-
-	//Runner listener
-	go func() {
-		var (
-			progressbar = ui.NewProgressBar(100, &r.stats)
-			//progressBar = statistics.NewProgressBar(100, &r.stats)
-			mutex sync.Mutex
-		)
-		for {
-			select {
-			case <-r.channel.Statistic:
-				if !r.Conf.Option.NoDisplay && r.TerminalUIMode {
-					terminalUI.Send(r.stats)
-				}
-
-			case result := <-r.channel.Result:
-				r.stats.Count()
-
-				if r.VerifyMode {
-					mutex.Lock()
-					learnt[result.TargetHashId] = append(learnt[result.TargetHashId], knowledge.Learnt{
-						Payload:                 result.Payload,
-						Response:                result.Response,
-						HTMLNode:                httpprepare.GetHTMLNode(result.Response.Body),
-						Extract:                 result.Scanner.Extract,
-						HttpReflectSurroundings: result.Scanner.HttpReflectSurroundings,
-					})
-					mutex.Unlock()
-				} else if result.UnkownBehavior {
-					r.stats.Behavior.Count()
-
-					// Send the result to the output file specified by the user:
-					if r.OutputOK {
-						err := output.WriteJSON(r.stats.Output.GetCount(), outputFileWriter, result)
-						if err != nil {
-							log.Println(design.STATUS.ERROR, "Request ID:", result.RequestId, err)
-						}
-						r.stats.Output.Count()
-					}
-
-					// Display the final result to the screen (CLI)
-					if !r.Conf.Option.NoDisplay {
-						if r.TerminalUIMode {
-							terminalUI.Send(r.stats)
-							terminalUI.Send(result)
-						} else {
-							display.ToScreen(result)
-							progressbar.Print()
-						}
-					}
-				}
-			}
-		}
-	}()
-
-	//Listeners
-	wg.Add(2)
-	go r.listenerScanner()
-	go r.listenerHTTP()
-
-	// Give all the request jobs to the HTTP handler and wait until the handlers are completed with all the jobs:
-	jobHandlerAmount := r.jobToHandler(&r.handler.HTTP)
-	r.waitForHandlers(jobHandlerAmount)
-
-	// Wait for the handlers to finish
-	r.handler.HTTP.Wait()
-	r.handler.Scanner.Wait()
-
-	// Close the output file (if any output  have been handled)
-	if r.OutputOK {
-		if err := outputFileWriter.Close(); err != nil {
-			log.Fatal(err)
-		}
+	// Configure HTTP request
+	if r.request, err = rhttp.NewRequest(rhttp.Config{
+		Methods:     opt.Methods,
+		Headers:     rhttp.MakeHeaders(opt.Headers),
+		Url:         opt.Url,
+		URIPath:     opt.URIPath,
+		Body:        opt.Body,
+		RespectHSTS: opt.RespectHSTS,
+	},
+		&rawhttp.Options{
+			Timeout:                time.Duration(opt.Timeout) * time.Millisecond,
+			FollowRedirects:        opt.FollowRedirect,
+			MaxRedirects:           3,
+			AutomaticHostHeader:    opt.AutomaticHostHeader,
+			AutomaticContentLength: opt.AutomaticContentLength,
+			Proxy:                  opt.Proxy,
+			ProxyDialTimeout:       time.Duration(opt.ProxyDialTimeout) * time.Millisecond,
+		},
+		/* &rawhttp.Options{
+			Timeout:                7000 * time.Millisecond,
+			FollowRedirects:        opt.FollowHostRedirects,
+			MaxRedirects:           opt.MaxRedirects,
+			AutomaticHostHeader:    opt.AutomaticHostHeader,
+			AutomaticContentLength: opt.AutomaticContentLength,
+			//CustomHeaders:          opt.Headers,
+			ForceReadAllBody: true,
+			//CustomRawBytes:         "",
+			Proxy:            opt.Proxy,
+			ProxyDialTimeout: 7000 * time.Millisecond,
+			//SNI:                    "",
+			//FastDialer:             "",
+		}, */
+	); err != nil {
+		return r, err
 	}
 
-	if r.TerminalUIMode {
-		terminalUI.Quit()
-		wg.Wait()
-	}
-
-	return knowledge.GetKnowledge(learnt), r.stats, nil
-}
-
-// Listen for results from the HTTP handler and preform a scan for each intercepted HTTP result:
-func (r *Runner) listenerScanner() {
-	for {
-		scanResult := <-r.channel.ListenerScanner
-		if scanResult.Error != nil {
-			verbose.Show(scanResult.Error)
-		} else {
-			r.stats.Scanner.Count()
-			r.channel.Result <- scanResult.Output
-		}
-	}
-}
-
-// Listen for HTTP request/response results from the request handler and add the response as a job to the scanner handler:
-func (r *Runner) listenerHTTP() {
-	for {
-		resultHTTP := <-r.channel.ListenerHTTP
-		r.stats.Request.Count()
-
-		//Check if we got a valid HTTP response from our requested target or if any error appeared:
-		if resultHTTP.Error != nil {
-			r.stats.Response.CountError()
-			r.channel.Statistic <- true
-			verbose.Show(resultHTTP.Error)
-			continue
-		}
-		r.stats.Response.Count()
-		r.stats.Response.UpdateTime(resultHTTP.Response.Time)
-
-		//Filter the HTTP response (if set):
-		filterResp := httpfilter.Response{
-			Body:         []byte(resultHTTP.Response.Body),
-			StatusCode:   resultHTTP.Response.StatusCode,
-			ResponseSize: resultHTTP.Response.ResponseBodySize,
-			WordCount:    resultHTTP.Response.WordCount,
-			LineCount:    resultHTTP.Response.LineCount,
-			ResponseTime: resultHTTP.Response.Time,
-			Headers:      resultHTTP.Response.Header,
-		}
-
-		// HTTP Filter filter/match (if set)
-		if r.Conf.Httpfilter.Run(filterResp) || (r.Conf.HttpMatch.IsSet() && !r.Conf.HttpMatch.Run(filterResp)) {
-			r.stats.Response.CountFilter()
-			r.channel.Statistic <- true
-			continue
-		}
-
-		//Give the scanner handler job related to the Http result (request/response):
-		r.handler.Scanner.AddJob(resultHTTP)
-	}
-}
-
-// Validate and verify the output to store the result to (if set):
-// Note : (will panic in case an error is triggered)
-func (r *Runner) MustValidateOutput() *os.File {
-	var (
-		fileWriter = &os.File{}
-		err        error
-	)
-	//Create output file and create a file writer (*if output file set*):
-	if r.OutputOK {
-		if !files.FileExist(r.Conf.Option.Output) || r.Conf.Option.Overwrite {
-			fileWriter, err = os.OpenFile(r.Conf.Option.Output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-
-			if err != nil {
-				log.Panicln(err)
-
-			} else if err = fileWriter.Truncate(0); err != nil {
-				log.Panicln(err)
-
-			} else if _, err = fileWriter.Seek(0, 0); err != nil {
-				log.Panicln(err)
-			}
-		} else {
-			err = fmt.Errorf("%s The specified output file already exists (\033[33m%s\033[0m), use the overwrite option to overwrite it", design.STATUS.FAIL, r.Conf.Option.Output)
-			log.Panicln(err)
-		}
-		verbose.Show("Save result to output file: " + r.Conf.Option.Output)
-	}
-	return fileWriter
-}
-
-func (r *Runner) jobToHandler(requestHandler *request.Handler) int {
-	var (
-		payloadWordlist = r.Conf.Wordlist.GetAll()
-		headersArray    = r.Conf.Option.Headers
-		postbody        = r.Conf.Option.PostData
-		jobAmount       = 0
-	)
-	for hash, host := range r.Conf.Option.Hosts {
-		param := r.Conf.Option.Params[hash]
-		rawURL := host.URL
-
-		for _, tag := range payloads.TAGS {
-			// Check if we should adapt to "behavior verification mode":
-			if (r.VerifyMode && tag != payloads.TAG_VERIFY) || (!r.VerifyMode && tag == payloads.TAG_VERIFY) {
-				continue
-			}
-
-			wordlist := payloadWordlist[tag]
-			for _, payload := range wordlist {
-				// Prepare the request by inserting the current payload into the request:
-				// !Note : (Some variables given will be modified)
-				insert := insertpoint.NewInsert(r.Conf.Option.InsertKeyword, payload)
-
-				URLStruct, _ := url.Parse(rawURL)
-
-				if param.AutoQueryURL {
-					URLStruct.RawQuery = param.URL.RawQueryInsertPoint
-					rawURL = URLStruct.String()
-				}
-
-				if param.AutoQueryBody {
-					postbody = param.Body.RawQueryInsertPoint
-				}
-
-				if param.AutoQueryCookie {
-					headersArray = request.SetNewHeaderValue(headersArray, "cookie", param.Cookie.RawQueryInsertPoint)
-				}
-
-				randomUserAgents, err := getRandomUserAgent(global.FILE_RANDOMAGENT)
-				if err != nil {
-					log.Fatalf("Random User-Agent:", err)
-				}
-
-				requestSettings := request.RequestSettings{
-					UserAgents:   randomUserAgents,
-					TargetHashId: hash,
-					Tag:          tag,
-					Payload:      payload,
-					URLOriginal:  rawURL,
-					Parameter:    r.Conf.Option.Params[hash],
-					URL:          insert.SetURL(rawURL),
-					Method:       insert.SetMethod(host.Method),
-					RequestBase: request.RequestBase{
-						Headers:              insert.SetHeaders(headersArray),
-						PostBody:             insert.SetPostBody(postbody),
-						RandomUserAgent:      r.Conf.Option.RandomAgent,
-						HeadersOriginalArray: r.Conf.Option.Headers,
-					},
-				}
-				jobAmount++
-				requestHandler.AddJob(requestSettings)
-			}
-		}
-	}
-	return jobAmount
-}
-
-// Take a file containing user agents
-func getRandomUserAgent(file string) ([]string, error) {
-	content, err := ioutil.ReadFile(file)
+	// Configure HTTP filter
+	r.httpfilter, err = httpfilter.NewFilter(httpfilter.Config{
+		Mode:                  opt.FilterMode,
+		HeaderRegex:           opt.FilterHeaderRegex,
+		BodyRegex:             opt.FilterBodyRegex,
+		StatusCodes:           opt.FilterStatusCode,
+		WordCounts:            opt.FilterWordCount,
+		LineCounts:            opt.FilterLineCount,
+		ResponseSizes:         opt.FilterSize,
+		ResponseTimesMillisec: opt.FilterTime,
+		//TODO : //Header:                request.LstToHeaders(LstToKeyMap(opt.FilterHeader)),
+	})
 	if err != nil {
-		log.Fatalf("User-Agent file error :", err)
+		return r, err
 	}
-	return strings.Split(string(content), "\n"), nil
+
+	// Configure HTTP match filter
+	r.httpmatch, err = httpfilter.NewFilter(httpfilter.Config{
+		Mode:                  opt.MatchMode,
+		HeaderRegex:           opt.MatchHeaderRegex,
+		BodyRegex:             opt.MatchBodyRegex,
+		StatusCodes:           opt.MatchStatusCode,
+		WordCounts:            opt.MatchWordCount,
+		LineCounts:            opt.MatchLineCount,
+		ResponseSizes:         opt.MatchSize,
+		ResponseTimesMillisec: opt.MatchTime,
+		//TODO : //Header:                request.LstToHeaders(LstToKeyMap(opt.MatchHeader)),
+	})
+	if err != nil {
+		return r, err
+	}
+
+	// Setup randomness config
+	r.randomness, err = randomness.NewRandomness(randomness.Config{
+		InRow:      randomness.DEFAULT_INROW,
+		Vocal:      randomness.DEFAULT_VOCAL,
+		Digit:      randomness.DEFAULT_DIGIT,
+		Consonant:  randomness.DEFAULT_CONSONANT,
+		Blacklist:  randomness.DEFAULT_BLACKLISTS,
+		BlackRegex: randomness.DEFAULT_BLACKREGEX,
+		Spaces:     []rune{' ', '_', '-', '.'},
+	})
+	if err != nil {
+		log.Println(err)
+	}
+
+	// Define worker pools
+	r.workerpool.request, err = ants.NewPool(opt.ThreadsRequest)
+	r.workerpool.scanner, err = ants.NewPool(opt.ThreadsScanner)
+
+	// Make the runner
+	if err := r.make(); err != nil {
+		return r, err
+	}
+
+	return r, nil
 }
 
-func (r *Runner) waitForHandlers(jobHandlerAmount int) {
-	for {
-		time.Sleep(100 * time.Millisecond)
-		if jobHandlerAmount > 0 && jobHandlerAmount == r.handler.HTTP.GetJobAmount() && r.handler.HTTP.GetInProcess() == 0 {
-			return
-		}
+func (r *Runner) make() error {
+	if err := r.request.MakeCoreRequests(); err != nil {
+		return err
 	}
+	if err := r.payload.MakeWordlist(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Runner) FetchKnowledge() error {
+	r.setMode(mode_knowledge)
+	err := r.run()
+	// Merge the knowledge
+	if r.mode == mode_knowledge {
+		r.knowledge.SetMergeKnowledge()
+	}
+	return err
+}
+
+func (r *Runner) RunFuzz() (Statistic, error) {
+	if !r.hasKnowledge() {
+		return r.statistic, errors.New("can not run fuzz, no knowledge of target")
+	}
+
+	r.setMode(mode_fuzz)
+	if err := r.run(); err != nil {
+		return r.statistic, err
+	}
+	return r.statistic, nil
+}
+
+func (r *Runner) run() error {
+	// Create the log file to store all logs in
+	/* fileLog, err := makeLog(r.Option.LogFile)
+	if err != nil {
+		return err
+	}
+	defer fileLog.Close() */
+
+	// TODO : Move to each global run func and mode knowledge handler to its run
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start handlers
+	if r.mode == mode_knowledge {
+		r.wg.process.Add(1)
+		go r.handleKnowledge(ctx)
+	}
+	r.wg.process.Add(4)
+	go r.handlerJobRequest(ctx)
+	go r.handleJobScanner(ctx)
+	go r.handlerResponse(ctx)
+	go r.handlerResult(ctx)
+
+	r.sendCoreJobs()
+	r.waitJobs()
+
+	// safely kill all running processes
+	cancel()
+	r.wg.process.Wait()
+
+	return nil
+}
+
+func (r *Runner) waitJobs() {
+	for {
+		if !r.wg.httpRequest.HasJob() && len(r.channel.httpRequest) == 0 &&
+			!r.wg.httpResponse.HasJob() && len(r.channel.httpResponse) == 0 &&
+			!r.wg.scanner.HasJob() && len(r.channel.scanner) == 0 &&
+			!r.wg.knowledge.HasJob() && len(r.channel.knowledge) == 0 &&
+			!r.wg.result.HasJob() && len(r.channel.result) == 0 {
+			break
+		}
+		time.Sleep(1000 * time.Millisecond)
+	}
+}
+
+// Set mode knowledge / fuzz
+func (r *Runner) setMode(mode string) {
+	r.mode = strings.ToLower(mode)
+}
+
+// Get mode knowledge / fuzz
+func (r *Runner) getMode() string {
+	return r.mode
 }
