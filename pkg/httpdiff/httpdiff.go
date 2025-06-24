@@ -3,7 +3,7 @@ package httpdiff
 import (
 	"slices"
 
-	"github.com/Brum3ns/firefly/pkg/httpprepare"
+	"github.com/Brum3ns/firefly/pkg/httpnode"
 	"github.com/Brum3ns/firefly/pkg/randomness"
 )
 
@@ -20,8 +20,8 @@ type Config struct {
 }
 
 type Compare struct {
-	HeaderMergeNode httpprepare.Header
-	HTMLMergeNode   httpprepare.HTMLNodeCombine
+	HeaderMergeNode httpnode.HeaderNode
+	HTMLMergeNode   httpnode.HTMLNodeCombine
 }
 
 type Result struct {
@@ -33,8 +33,8 @@ type Result struct {
 type HeaderResult struct {
 	OK         bool
 	HeaderHits int
-	Appear     httpprepare.Header
-	Disappear  httpprepare.Header
+	Appear     httpnode.HeaderNode
+	Disappear  httpnode.HeaderNode
 }
 
 type HTMLResult struct {
@@ -51,7 +51,7 @@ type HTMLNodeDiff struct {
 	CommentHits        int
 	AttributeHits      int
 	AttributeValueHits int
-	httpprepare.HTMLNode
+	httpnode.HTMLNode
 }
 type Filter struct {
 	HeaderFilter
@@ -59,7 +59,7 @@ type Filter struct {
 }
 
 type HeaderFilter struct {
-	Header httpprepare.Header
+	Header httpnode.HeaderNode
 }
 
 type diffNode struct {
@@ -81,7 +81,7 @@ func newDiffNode() diffNode {
 }
 
 // Run the [diff]erence enumiration process for the HTML node
-func (diff *Difference) GetHTMLNodeDiff(htmlNode httpprepare.HTMLNode) HTMLResult {
+func (diff *Difference) GetHTMLNodeDiff(htmlNode httpnode.HTMLNode) HTMLResult {
 	totalHits := 0
 	storage := struct {
 		appearHits    int
@@ -134,7 +134,7 @@ func (diff *Difference) GetHTMLNodeDiff(htmlNode httpprepare.HTMLNode) HTMLResul
 			CommentHits:        storage.appear[4].hit,
 			AttributeHits:      storage.appear[5].hit,
 			AttributeValueHits: storage.appear[6].hit,
-			HTMLNode: httpprepare.HTMLNode{
+			HTMLNode: httpnode.HTMLNode{
 				TagStart:       storage.appear[0].data,
 				TagEnd:         storage.appear[1].data,
 				TagSelfClose:   storage.appear[2].data,
@@ -152,7 +152,7 @@ func (diff *Difference) GetHTMLNodeDiff(htmlNode httpprepare.HTMLNode) HTMLResul
 			CommentHits:        storage.disappear[4].hit,
 			AttributeHits:      storage.disappear[5].hit,
 			AttributeValueHits: storage.disappear[6].hit,
-			HTMLNode: httpprepare.HTMLNode{
+			HTMLNode: httpnode.HTMLNode{
 				TagStart:       storage.disappear[0].data,
 				TagEnd:         storage.disappear[1].data,
 				TagSelfClose:   storage.disappear[2].data,
@@ -166,10 +166,10 @@ func (diff *Difference) GetHTMLNodeDiff(htmlNode httpprepare.HTMLNode) HTMLResul
 }
 
 // Take two prepared header structures and compare their differences
-func (diff *Difference) GetHeadersDiff(HeaderNode httpprepare.Header) HeaderResult {
+func (diff *Difference) GetHeadersDiff(HeaderNode httpnode.HeaderNode) HeaderResult {
 	var (
-		appear      = httpprepare.NewHeader()
-		disappear   = httpprepare.NewHeader()
+		appear      = httpnode.NewHeader()
+		disappear   = httpnode.NewHeader()
 		testedItems = make(map[string]struct{})
 		totalHits   = 0
 	)
@@ -207,7 +207,7 @@ func (diff *Difference) GetHeadersDiff(HeaderNode httpprepare.Header) HeaderResu
 
 		if _, ok := testedItems[knownHeader]; !ok {
 			// Extract the highest difference from the known values and add it
-			disappear[knownHeader] = httpprepare.HeaderInfo{
+			disappear[knownHeader] = httpnode.HeaderInfo{
 				Amount: []int{highestLstIntValue(knownHeaderData.Amount)},
 				Values: knownHeaderData.Values,
 			}
