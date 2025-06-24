@@ -1,110 +1,46 @@
 package knowledge
 
 import (
-	"reflect"
-
-	"github.com/Brum3ns/firefly/internal/output"
-	"github.com/Brum3ns/firefly/pkg/extract"
-	"github.com/Brum3ns/firefly/pkg/httpprepare"
+	"github.com/Brum3ns/firefly/pkg/httpnode"
 	"github.com/Brum3ns/firefly/pkg/httpreflect"
+	"github.com/Brum3ns/firefly/pkg/rhttp"
 )
 
 type Knowledge struct {
-	PayloadVerify           string
-	Responses               []output.Response
-	Requests                []output.Request
+	Storage map[string][]Storage
+	Merged  map[string]MergedKnowledge
+}
+
+type MergedKnowledge struct {
+	Canary    string
+	Responses []rhttp.Response
+	//Requests                []output.Request
 	HttpReflectSurroundings []httpreflect.Surrounding
-	Combine                 Combine
+	Merge                   Merge
 }
 
-type Combine struct {
-	Extract    extract.ResultCombine
-	HTMLNode   httpprepare.HTMLNodeCombine
-	HeaderNode httpprepare.Header
-}
-
-type Learnt struct {
-	Payload                 string
-	HTMLNode                httpprepare.HTMLNode
-	Extract                 extract.Result
-	Response                output.Response
-	Request                 output.Request
-	HttpReflectSurroundings []httpreflect.Surrounding
-}
-
-func NewKnowledge() *Knowledge {
-	return &Knowledge{}
-}
-
-func NewCombine() Combine {
-	return Combine{
-		Extract:    extract.NewCombine(),
-		HTMLNode:   httpprepare.NewCombineHTMLNode(),
-		HeaderNode: httpprepare.NewHeader(),
+func NewKnowledge() Knowledge {
+	return Knowledge{
+		Storage: make(map[string][]Storage),
+		Merged:  make(map[string]MergedKnowledge),
 	}
 }
 
-func GetKnowledge(learnt map[string][]Learnt) map[string]Knowledge {
-	var storedKnowledge = make(map[string]Knowledge)
-	c := NewCombine()
-
-	for hashId, data := range learnt {
-		k := Knowledge{}
-		for _, d := range data {
-			k.PayloadVerify = d.Payload
-			k.Requests = append(k.Requests, d.Request)
-			k.Responses = append(k.Responses, d.Response)
-			k.HttpReflectSurroundings = httpreflect.MergeUniqueSurroundings(k.HttpReflectSurroundings, d.HttpReflectSurroundings)
-
-			k.Combine.HeaderNode = c.HeaderNode.Merge(d.Response.Headers)
-			k.Combine.Extract = combineAppendMaps(reflect.ValueOf(&c.Extract), d.Extract).(extract.ResultCombine)
-			k.Combine.HTMLNode = combineAppendMaps(reflect.ValueOf(&c.HTMLNode), d.HTMLNode).(httpprepare.HTMLNodeCombine)
-		}
-		storedKnowledge[hashId] = k
-	}
-
-	return storedKnowledge
+func (k *Knowledge) SetMergeKnowledge() {
+	k.Merged = GetKnowledge(k.Storage)
 }
 
-// Take a structure and combine all "map[string]int" into a map[string][]int and return the combined map:
-func combineAppendMaps(combineData reflect.Value, data any) interface{} {
-	combineData = combineData.Elem()
-	dataValue := reflect.ValueOf(data)
-	t := dataValue.Type()
-
-	//Extract all field from the given "data":
-	for i := 0; i < dataValue.NumField(); i++ {
-		data_field := dataValue.Field(i)
-		data_name := t.Field(i).Name
-
-		//In case the field is a correct map that can be combined, then procceed:
-		if data_map, ok := data_field.Interface().(map[string]int); ok {
-
-			//Extract the same field (by name) from "combineData" that was recently extracted from "data":
-			combineData_field := combineData.FieldByName(data_name)
-
-			//Make sure the "cData" field is a correct map that can be used to compare the original map from "data":
-			if combineData_map, ok := combineData_field.Interface().(map[string][]int); ok {
-
-				//Extract the key value and the key's value. Then add only the unique items from "newData" to "combineData"
-				for k, v := range data_map {
-					combineData_map[k] = appendUniqueInt(combineData_map[k], v)
-				}
-			}
-		}
-	}
-	return combineData.Interface()
-}
-
-// Append a string to a list Works similar as append but do not append duplicates or empty strings
-func appendUniqueInt(l []int, i int) []int {
-	if len(l) == 0 {
-		return append(l, i)
-	}
-	for _, item := range l {
-		if item == i {
-			return l
-		}
-	}
-	return append(l, i)
+func (k *Knowledge) AppendKnowledge(targetHash, payload string, resp rhttp.Response) {
+	k.Storage[targetHash] = append(
+		k.Storage[targetHash],
+		Storage{
+			Payload:    payload,
+			HTMLNode:   httpnode.GetHTMLNode(resp.Body),
+			HeaderNode: httpnode.GetHeaderNode(resp.Headers),
+			//Extract: ,
+			Response: resp,
+			//Request: result.job.,
+			//HttpReflectSurroundings: ,
+		},
+	)
 }
