@@ -23,3 +23,7 @@ func (wg *WaitGroup) Done() {
 func (wg *WaitGroup) GetCount() int {
 	return int(atomic.LoadInt64(&wg.count))
 }
+
+func (wg *WaitGroup) HasJob() bool {
+	return int(atomic.LoadInt64(&wg.count)) > 0
+}
