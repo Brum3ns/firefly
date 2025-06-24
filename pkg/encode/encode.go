@@ -1,7 +1,9 @@
-// supported encode format for Firfly
+// Package encode provides common encodings for pentesting payload manipulation.
 package encode
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/base32"
 	"encoding/base64"
 	"encoding/hex"
@@ -12,70 +14,134 @@ import (
 	"strings"
 )
 
-var (
-	encodeTo = map[string]func(string) string{
-		"surl":   func(s string) string { return Url(s) },
-		"sdurl":  func(s string) string { return DoubleUrl(s) },
-		"url":    func(s string) string { return UrlEsacpe(s) },
-		"durl":   func(s string) string { return UrlDoubleEscape(s) },
-		"base64": func(s string) string { return Base64(s) },
-		"base32": func(s string) string { return Base32(s) },
-		"html":   func(s string) string { return HTMLEsacpe(s) },
-		"htmle":  func(s string) string { return HTMLEquivalent(s) },
-		"hex":    func(s string) string { return Hex(s) },
-		"json":   func(s string) string { sJson, _ := json.Marshal(s); return string(sJson) },
-		"binary": func(s string) string {
-			var b string
-			for _, r := range s {
-				b = fmt.Sprintf("%s%.8b", b, r)
-			}
-			return b
-		},
-	}
-)
+type Encoder func(string) (string, error)
 
-func Encode(payload string, encodes []string) string {
-	for _, encode := range encodes {
-		if _, ok := encodeTo[strings.ToLower(encode)]; ok {
-			payload = encodeTo[strings.ToLower(encode)](payload)
+var encodeFuncs = map[string]Encoder{
+	"surl":    SingleUrlEncode,
+	"sdurl":   DoubleUrlEncode,
+	"url":     UrlEscape,
+	"durl":    UrlDoubleEscape,
+	"html":    HTMLEscape,
+	"htmle":   HTMLEquivalent,
+	"base64":  Base64,
+	"base32":  Base32,
+	"hex":     Hex,
+	"json":    JSONEncode,
+	"binary":  BinaryEncode,
+	"gzipb64": GzipBase64,
+	"unicode": UnicodeEscape,
+}
+
+// Encode applies the selected encodings in order.
+// Supports format: "xor:<key>" and others.
+func Encode(payload string, encodings []string) (string, error) {
+	var err error
+	for _, enc := range encodings {
+		if strings.HasPrefix(enc, "xor:") {
+			key := strings.TrimPrefix(enc, "xor:")
+			payload, err = XOREncode(payload, key)
+			if err != nil {
+				return "", fmt.Errorf("xor error: %w", err)
+			}
+			continue
+		}
+		encFunc, ok := encodeFuncs[strings.ToLower(enc)]
+		if !ok {
+			return "", fmt.Errorf("unsupported encoding: %s", enc)
+		}
+		payload, err = encFunc(payload)
+		if err != nil {
+			return "", fmt.Errorf("error in %s encoding: %w", enc, err)
 		}
 	}
-	return payload
+	return payload, nil
 }
 
-func Url(s string) string {
-	return ("%" + hex.EncodeToString([]byte(s)))
+// --- Encoding Implementations ---
+
+func SingleUrlEncode(s string) (string, error) {
+	return "%" + hex.EncodeToString([]byte(s)), nil
 }
 
-func DoubleUrl(s string) string {
-	return strings.ReplaceAll(Url(s), "%", "%25")
+func DoubleUrlEncode(s string) (string, error) {
+	encoded := "%" + hex.EncodeToString([]byte(s))
+	return strings.ReplaceAll(encoded, "%", "%25"), nil
 }
 
-// Alias of : url.QueryEscape()
-func UrlEsacpe(s string) string {
-	return url.QueryEscape(s)
+func UrlEscape(s string) (string, error) {
+	return url.QueryEscape(s), nil
 }
 
-func UrlDoubleEscape(s string) string {
-	return strings.ReplaceAll(url.QueryEscape(s), "%", "%25")
+func UrlDoubleEscape(s string) (string, error) {
+	escaped := url.QueryEscape(s)
+	return strings.ReplaceAll(escaped, "%", "%25"), nil
 }
 
-func HTMLEsacpe(s string) string {
-	return html.EscapeString(s)
+func HTMLEscape(s string) (string, error) {
+	return html.EscapeString(s), nil
 }
 
-func HTMLEquivalent(s string) string {
-	return strings.ReplaceAll(html.EscapeString(s), "&#34;", "&quot;")
+func HTMLEquivalent(s string) (string, error) {
+	escaped := html.EscapeString(s)
+	escaped = strings.ReplaceAll(escaped, "&#34;", "&quot;")
+	escaped = strings.ReplaceAll(escaped, "&#39;", "&apos;")
+	return escaped, nil
 }
 
-func Base32(s string) string {
-	return base32.StdEncoding.EncodeToString([]byte(s))
+func Base32(s string) (string, error) {
+	return base32.StdEncoding.EncodeToString([]byte(s)), nil
 }
 
-func Base64(s string) string {
-	return base64.StdEncoding.EncodeToString([]byte(s))
+func Base64(s string) (string, error) {
+	return base64.StdEncoding.EncodeToString([]byte(s)), nil
 }
 
-func Hex(s string) string {
-	return hex.EncodeToString([]byte(s))
+func Hex(s string) (string, error) {
+	return hex.EncodeToString([]byte(s)), nil
+}
+
+func JSONEncode(s string) (string, error) {
+	j, err := json.Marshal(s)
+	return string(j), err
+}
+
+func BinaryEncode(s string) (string, error) {
+	var b strings.Builder
+	for _, r := range s {
+		_, err := fmt.Fprintf(&b, "%.8b", r)
+		if err != nil {
+			return "", err
+		}
+	}
+	return b.String(), nil
+}
+
+func GzipBase64(s string) (string, error) {
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	_, err := gw.Write([]byte(s))
+	if err != nil {
+		return "", err
+	}
+	gw.Close()
+	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+}
+
+func UnicodeEscape(s string) (string, error) {
+	var b strings.Builder
+	for _, r := range s {
+		fmt.Fprintf(&b, "\\u%04x", r)
+	}
+	return b.String(), nil
+}
+
+func XOREncode(input, key string) (string, error) {
+	if key == "" {
+		return "", fmt.Errorf("key cannot be empty")
+	}
+	result := make([]byte, len(input))
+	for i := range input {
+		result[i] = input[i] ^ key[i%len(key)]
+	}
+	return hex.EncodeToString(result), nil
 }
