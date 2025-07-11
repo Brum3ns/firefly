@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
+
+	"github.com/Brum3ns/firefly/internal/knowledge"
 )
 
 func (r *Runner) handleKnowledge(ctx context.Context) {
@@ -13,13 +15,17 @@ func (r *Runner) handleKnowledge(ctx context.Context) {
 		case jobScanner := <-r.channel.knowledge:
 			r.wg.scanner.Done()
 
-			method := jobScanner.job.httpRawRequest.Method
-			url := jobScanner.job.httpRawRequest.Url
+			method := jobScanner.coreJob.httpRawRequest.Method
+			url := jobScanner.coreJob.httpRawRequest.Url
 
 			r.knowledge.AppendKnowledge(
-				makeTargetHash(method, url),
-				jobScanner.job.payload,
-				jobScanner.job.httpResponse,
+				knowledge.KnowledgeMeta{
+					TargetHash:          makeTargetHash(method, url),
+					Payload:             jobScanner.coreJob.payload,
+					HTTPResponse:        jobScanner.coreJob.httpResponse,
+					ExtractResultBody:   jobScanner.scanResult.Extract.Body,
+					ExtractResultHeader: jobScanner.scanResult.Extract.Header,
+				},
 			)
 			r.wg.knowledge.Done()
 

@@ -3,19 +3,21 @@ package runner
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/Brum3ns/firefly/internal/knowledge"
 	"github.com/Brum3ns/firefly/internal/option"
-	"github.com/Brum3ns/firefly/internal/scan"
 	"github.com/panjf2000/ants/v2"
 
+	"github.com/Brum3ns/firefly/pkg/extract"
 	"github.com/Brum3ns/firefly/pkg/httpfilter"
+	"github.com/Brum3ns/firefly/pkg/httpreflect"
 	"github.com/Brum3ns/firefly/pkg/payload"
 	"github.com/Brum3ns/firefly/pkg/randomness"
 	"github.com/Brum3ns/firefly/pkg/rhttp"
+	"github.com/Brum3ns/firefly/pkg/statistics"
 	"github.com/Brum3ns/firefly/pkg/waitgroup"
 	"github.com/projectdiscovery/rawhttp"
 )
@@ -26,19 +28,20 @@ const (
 )
 
 type Runner struct {
-	mode       string
-	wg         waitGroup
-	channel    channel
-	payload    payload.Payload
-	scan       scan.Scan
-	request    rhttp.Http
-	option     option.Option
-	httpfilter httpfilter.Filter
-	httpmatch  httpfilter.Filter
-	randomness randomness.Randomness
-	statistic  Statistic
-	workerpool workerpool
-	knowledge  knowledge.Knowledge
+	mode        string
+	wg          waitGroup
+	channel     channel
+	payload     payload.Payload
+	extract     extract.Extract
+	request     rhttp.Http
+	option      option.Option
+	httpfilter  httpfilter.Filter
+	httpreflect httpreflect.Reflect
+	httpmatch   httpfilter.Filter
+	randomness  randomness.Randomness
+	statistic   statistics.Statistic
+	workerpool  workerpool
+	knowledge   knowledge.Knowledge
 }
 
 type workerpool struct {
@@ -53,6 +56,7 @@ type waitGroup struct {
 	scanner      waitgroup.WaitGroup
 	httpRequest  waitgroup.WaitGroup
 	httpResponse waitgroup.WaitGroup
+	verbose      waitgroup.WaitGroup
 }
 
 type channel struct {
@@ -60,48 +64,65 @@ type channel struct {
 	scanner      chan jobScanner
 	httpResponse chan jobHTTP
 	knowledge    chan jobScanner
+	statistic    chan jobScanner
 	result       chan jobScanner
 }
 
 func NewRunner(opt option.Option) (Runner, error) {
 	var err error
+
 	var r = Runner{
 		option:    opt,
+		statistic: statistics.NewStatistic(),
 		knowledge: knowledge.NewKnowledge(),
+		httpreflect: httpreflect.NewReflect(httpreflect.Config{
+			IndexEndLength:   opt.Payload.ReflectEnd,
+			IndexStartLength: opt.Payload.ReflectStart,
+			Canary:           opt.Payload.VerifyCanary,
+		}),
 		channel: channel{
-			scanner:      make(chan jobScanner, opt.BufferPoolScanner),
-			httpRequest:  make(chan jobHTTP, opt.BufferPoolRequest),
-			httpResponse: make(chan jobHTTP, opt.BufferPoolRequest),
-			knowledge:    make(chan jobScanner, opt.BufferPoolKnowledge),
-			result:       make(chan jobScanner, opt.BufferPoolResult),
+			scanner:      make(chan jobScanner, opt.Performance.BufferPoolScanner),
+			httpRequest:  make(chan jobHTTP, opt.Performance.BufferPoolRequest),
+			httpResponse: make(chan jobHTTP, opt.Performance.BufferPoolRequest),
+			knowledge:    make(chan jobScanner, opt.Performance.BufferPoolKnowledge),
+			result:       make(chan jobScanner, opt.Performance.BufferPoolResult),
+			statistic:    make(chan jobScanner, 1000),
 		},
 	}
 
 	// Set the payload instance
 	if r.payload, err = payload.NewPayload(payload.Config{
-		WordlistFile:  opt.PayloadWordlist,
-		PayloadVerify: opt.PayloadVerify,
+		WordlistFile:  opt.Payload.Wordlist,
+		PayloadVerify: opt.Payload.VerifyCanary,
 	}); err != nil {
 		return r, err
 	}
 
+	// Setup extract config
+	r.extract, err = extract.NewExtract(extract.Config{
+		FilenameWordlist: r.option.Extract.Wordlist,
+		FilenameRegexes:  r.option.Extract.Regex,
+	})
+
 	// Configure HTTP request
 	if r.request, err = rhttp.NewRequest(rhttp.Config{
-		Methods:     opt.Methods,
-		Headers:     rhttp.MakeHeaders(opt.Headers),
-		Url:         opt.Url,
-		URIPath:     opt.URIPath,
-		Body:        opt.Body,
-		RespectHSTS: opt.RespectHSTS,
+		Version:     opt.Http.Version,
+		Methods:     opt.Http.Methods,
+		Headers:     rhttp.MakeHeaders(opt.Http.Headers),
+		Url:         opt.Input.Url,
+		URIPath:     opt.Http.URIPath,
+		Body:        opt.Http.Body,
+		RespectHSTS: opt.Http.RespectHSTS,
 	},
 		&rawhttp.Options{
-			Timeout:                time.Duration(opt.Timeout) * time.Millisecond,
-			FollowRedirects:        opt.FollowRedirect,
+			Timeout:                time.Duration(opt.Http.Timeout) * time.Millisecond,
+			FollowRedirects:        opt.Http.FollowRedirect,
 			MaxRedirects:           3,
-			AutomaticHostHeader:    opt.AutomaticHostHeader,
-			AutomaticContentLength: opt.AutomaticContentLength,
-			Proxy:                  opt.Proxy,
-			ProxyDialTimeout:       time.Duration(opt.ProxyDialTimeout) * time.Millisecond,
+			AutomaticHostHeader:    opt.Http.AutomaticHostHeader,
+			AutomaticContentLength: opt.Http.AutomaticContentLength,
+			Proxy:                  opt.Http.Proxy,
+			ProxyDialTimeout:       time.Duration(opt.Http.ProxyDialTimeout) * time.Millisecond,
+			CustomRawBytes:         []byte(opt.Input.RawHTTPRequest),
 		},
 		/* &rawhttp.Options{
 			Timeout:                7000 * time.Millisecond,
@@ -123,14 +144,14 @@ func NewRunner(opt option.Option) (Runner, error) {
 
 	// Configure HTTP filter
 	r.httpfilter, err = httpfilter.NewFilter(httpfilter.Config{
-		Mode:                  opt.FilterMode,
-		HeaderRegex:           opt.FilterHeaderRegex,
-		BodyRegex:             opt.FilterBodyRegex,
-		StatusCodes:           opt.FilterStatusCode,
-		WordCounts:            opt.FilterWordCount,
-		LineCounts:            opt.FilterLineCount,
-		ResponseSizes:         opt.FilterSize,
-		ResponseTimesMillisec: opt.FilterTime,
+		Mode:                  opt.Filter.Mode,
+		HeaderRegex:           opt.Filter.HeaderRegex,
+		BodyRegex:             opt.Filter.BodyRegex,
+		StatusCodes:           opt.Filter.StatusCode,
+		WordCounts:            opt.Filter.WordCount,
+		LineCounts:            opt.Filter.LineCount,
+		ResponseSizes:         opt.Filter.BodySize,
+		ResponseTimesMillisec: opt.Filter.ResponeTime,
 		//TODO : //Header:                request.LstToHeaders(LstToKeyMap(opt.FilterHeader)),
 	})
 	if err != nil {
@@ -139,14 +160,14 @@ func NewRunner(opt option.Option) (Runner, error) {
 
 	// Configure HTTP match filter
 	r.httpmatch, err = httpfilter.NewFilter(httpfilter.Config{
-		Mode:                  opt.MatchMode,
-		HeaderRegex:           opt.MatchHeaderRegex,
-		BodyRegex:             opt.MatchBodyRegex,
-		StatusCodes:           opt.MatchStatusCode,
-		WordCounts:            opt.MatchWordCount,
-		LineCounts:            opt.MatchLineCount,
-		ResponseSizes:         opt.MatchSize,
-		ResponseTimesMillisec: opt.MatchTime,
+		Mode:                  opt.Match.Mode,
+		HeaderRegex:           opt.Match.HeaderRegex,
+		BodyRegex:             opt.Match.BodyRegex,
+		StatusCodes:           opt.Match.StatusCode,
+		WordCounts:            opt.Match.WordCount,
+		LineCounts:            opt.Match.LineCount,
+		ResponseSizes:         opt.Match.BodySize,
+		ResponseTimesMillisec: opt.Match.ResponeTime,
 		//TODO : //Header:                request.LstToHeaders(LstToKeyMap(opt.MatchHeader)),
 	})
 	if err != nil {
@@ -164,12 +185,12 @@ func NewRunner(opt option.Option) (Runner, error) {
 		Spaces:     []rune{' ', '_', '-', '.'},
 	})
 	if err != nil {
-		log.Println(err)
+		return r, err
 	}
 
 	// Define worker pools
-	r.workerpool.request, err = ants.NewPool(opt.ThreadsRequest)
-	r.workerpool.scanner, err = ants.NewPool(opt.ThreadsScanner)
+	r.workerpool.request, err = ants.NewPool(opt.Performance.ThreadsRequest)
+	r.workerpool.scanner, err = ants.NewPool(opt.Performance.ThreadsScanner)
 
 	// Make the runner
 	if err := r.make(); err != nil {
@@ -199,7 +220,7 @@ func (r *Runner) FetchKnowledge() error {
 	return err
 }
 
-func (r *Runner) RunFuzz() (Statistic, error) {
+func (r *Runner) RunFuzz() (statistics.Statistic, error) {
 	if !r.hasKnowledge() {
 		return r.statistic, errors.New("can not run fuzz, no knowledge of target")
 	}
@@ -223,9 +244,15 @@ func (r *Runner) run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Start handlers
-	if r.mode == mode_knowledge {
-		r.wg.process.Add(1)
+	r.wg.process.Add(1)
+	switch r.mode {
+	case mode_knowledge:
 		go r.handleKnowledge(ctx)
+	case mode_fuzz:
+		go r.handlerStatistic(ctx)
+	default:
+		cancel()
+		return fmt.Errorf("invalid runner mode given, mode:[%v]", r.mode)
 	}
 	r.wg.process.Add(4)
 	go r.handlerJobRequest(ctx)
@@ -233,7 +260,11 @@ func (r *Runner) run() error {
 	go r.handlerResponse(ctx)
 	go r.handlerResult(ctx)
 
-	r.sendCoreJobs()
+	if err := r.sendCoreJobs(); err != nil {
+		cancel()
+		return fmt.Errorf("failed to send core jobs, error : %v", err)
+	}
+
 	r.waitJobs()
 
 	// safely kill all running processes
@@ -249,7 +280,8 @@ func (r *Runner) waitJobs() {
 			!r.wg.httpResponse.HasJob() && len(r.channel.httpResponse) == 0 &&
 			!r.wg.scanner.HasJob() && len(r.channel.scanner) == 0 &&
 			!r.wg.knowledge.HasJob() && len(r.channel.knowledge) == 0 &&
-			!r.wg.result.HasJob() && len(r.channel.result) == 0 {
+			!r.wg.result.HasJob() && len(r.channel.result) == 0 &&
+			!r.wg.verbose.HasJob() && len(r.channel.statistic) == 0 {
 			break
 		}
 		time.Sleep(1000 * time.Millisecond)

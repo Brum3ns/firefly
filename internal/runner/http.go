@@ -2,13 +2,13 @@ package runner
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
 	"github.com/Brum3ns/firefly/pkg/faker"
 	"github.com/Brum3ns/firefly/pkg/httpfilter"
 	"github.com/Brum3ns/firefly/pkg/payload"
+	"github.com/Brum3ns/firefly/pkg/rhttp"
 )
 
 func (r *Runner) handlerJobRequest(ctx context.Context) {
@@ -19,7 +19,7 @@ func (r *Runner) handlerJobRequest(ctx context.Context) {
 			r.workerpool.request.Submit(func() {
 				// Insert faker data
 				rawHttpRequest := string(job.httpRawRequest.TemplateRawRequest)
-				if !r.option.DisablePlaceholders {
+				if !r.option.Placeholder.Disable {
 					var err error
 					rawHttpRequest, err = faker.Generate(rawHttpRequest)
 					if err != nil {
@@ -32,11 +32,17 @@ func (r *Runner) handlerJobRequest(ctx context.Context) {
 				// Payload data insert
 				rawRequest := payload.Insert(
 					rawHttpRequest,
-					r.option.FuzzPlaceholder,
+					r.option.Payload.Placeholder,
 					job.payload,
 				)
 
 				timer := time.Now()
+
+				// Jitter delay if in knowledge mode
+				if r.mode == mode_knowledge && r.option.Knowledge.Jitter > 0 {
+					time.Sleep(rhttp.GetJitter(r.option.Knowledge.Jitter))
+				}
+
 				resp, err := r.request.Client.SendRawRequest(r.request.GetURL(), []byte(rawRequest))
 				if err != nil {
 					log.Printf("HTTP request failed, error : %v", err)
@@ -55,7 +61,7 @@ func (r *Runner) handlerJobRequest(ctx context.Context) {
 				r.wg.httpResponse.Add(1)
 				r.channel.httpResponse <- job
 				// HTTP request delay
-				time.Sleep(time.Duration(r.option.HttpDelay) * time.Millisecond)
+				time.Sleep(time.Duration(r.option.Http.Delay) * time.Millisecond)
 			})
 		case <-ctx.Done():
 			return
@@ -68,9 +74,6 @@ func (r *Runner) handlerResponse(ctx context.Context) {
 	for {
 		select {
 		case job := <-r.channel.httpResponse:
-
-			fmt.Println(r.wg.httpRequest.GetCount(), job.httpResponse.Time)
-
 			r.wg.httpRequest.Done()
 			//Filter the HTTP response (if set):
 			filterResp := httpfilter.Response{

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Brum3ns/firefly/pkg/payload"
 	"github.com/Brum3ns/firefly/pkg/rhttp"
 	"github.com/google/uuid"
 )
@@ -37,7 +38,7 @@ func (job *jobHTTP) setResponse(resp *http.Response, respTime time.Duration) err
 	return nil
 }
 
-func (r *Runner) sendCoreJobs() {
+func (r *Runner) sendCoreJobs() error {
 	var payloads []string
 	// Select payloads based on runner mode
 	switch r.mode {
@@ -45,13 +46,20 @@ func (r *Runner) sendCoreJobs() {
 		payloads = r.payload.GetWordlist()
 	case mode_knowledge:
 		// Add the verify payload the amount of time to verify the target knowledge
-		for i := 0; i < r.option.VerifyKnowledge; i++ {
-			payloads = append(payloads, r.option.PayloadVerify)
+		for i := 0; i < r.option.Knowledge.VerifyAmount; i++ {
+			payloads = append(payloads, r.option.Payload.VerifyCanary)
 		}
 	}
 	// Send the jobs
 	for _, httpReq := range r.request.GetCoreRawRequests() {
 		for _, pyld := range payloads {
+
+			// Make the payload
+			pyld, err := payload.ReplaceInOrder(pyld, r.option.Payload.Replace)
+			if err != nil {
+				return err
+			}
+
 			// Make HTTP request and insert payload
 			job := newJobHTTP(pyld)
 			job.setHttpRawRequest(httpReq)
@@ -60,4 +68,5 @@ func (r *Runner) sendCoreJobs() {
 			r.channel.httpRequest <- job
 		}
 	}
+	return nil
 }

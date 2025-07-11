@@ -9,17 +9,17 @@ import (
 
 type jobScanner struct {
 	id         string
-	job        jobHTTP
+	coreJob    jobHTTP
 	scanResult scan.Result
 }
 
 func newJobScanner(job jobHTTP) jobScanner {
 	return jobScanner{
-		id:  fmt.Sprintf("scan-%s", uuid.NewString()),
-		job: job,
+		id:      fmt.Sprintf("scan-%s", uuid.NewString()),
+		coreJob: job,
 	}
 }
 
-func (j jobScanner) setScanResult(result scan.Result) {
+func (j *jobScanner) setScanResult(result scan.Result) {
 	j.scanResult = result
 }

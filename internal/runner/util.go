@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 func makeLog(logFile string) (*os.File, error) {
@@ -25,4 +26,8 @@ func makeLog(logFile string) (*os.File, error) {
 	}
 	log.SetOutput(file)
 	return file, nil
+}
+
+func getTime() string {
+	return time.Now().Format(time.RFC3339Nano)
 }
