@@ -120,23 +120,23 @@ func DefaultConfig() Config {
 }
 
 // Set the whitelist. When a keyword in the whitelist is a sub-string of the tested value, the value will be treated as a non-random value
-func (r *Randomness) AppendWhitelist(lst []string) {
+func (r *Randomness) AppendBlacklist(lst []string) {
 	r.Config.Blacklist = append(r.Config.Blacklist, lst...)
 }
 
 // Set the blacklist. When a keyword in the blacklist is a sub-string of the tested value, the value will be treated as a random value
-func (r *Randomness) AppendBlacklist(lst []string) {
+func (r *Randomness) AppendWhitelist(lst []string) {
 	r.Config.Whitelist = append(r.Config.Whitelist, lst...)
 }
 
 // Set the whitelist. When a keyword in the whitelist is a sub-string of the tested value, the value will be treated as a non-random value
 func (r *Randomness) SetWhitelist(lst []string) {
-	r.Config.Blacklist = lst
+	r.Config.Whitelist = lst
 }
 
 // Set the blacklist. When a keyword in the blacklist is a sub-string of the tested value, the value will be treated as a random value
 func (r *Randomness) SetBlacklist(lst []string) {
-	r.Config.Whitelist = lst
+	r.Config.Blacklist = lst
 }
 
 // Set the blackregex that makes the string containg the keyword be treated as a *non-random value*
@@ -196,9 +196,16 @@ func (r *Randomness) UnsetTrigger(s string) error {
 
 // Check if the string given is likely to be random
 // Whitelist and regex will be prioritized if a match is found
-func (r *Randomness) IsRandom(s string) bool {
+func (r *Randomness) IsRandom(value string) bool {
+	if r.ContainsValidValue(value) {
+		return false // => Not random
+	}
+	if r.ContainsInvalidValue(value) {
+		return true // => Random
+	}
+
 	hit := 0
-	for _, char := range s {
+	for _, char := range value {
 		if !r.IsTrigger(char) {
 			hit = 0
 		} else {
@@ -210,12 +217,6 @@ func (r *Randomness) IsRandom(s string) bool {
 		}
 	}
 
-	if r.ContainsValidValue(s) {
-		return false // => Not random
-	}
-	if r.ContainsInvalidValue(s) {
-		return true // => Random
-	}
 	return false
 }
 
