@@ -9,12 +9,15 @@ import (
 )
 
 type Storage struct {
-	Payload    string
-	HTMLNode   httpnode.HTMLNode
-	HeaderNode httpnode.HeaderNode
-	Extract    extract.Result
-	Response   rhttp.Response
-	Request    rhttp.Http
+	Payload        string
+	HTMLNode       httpnode.HTMLNode
+	HeaderNode     httpnode.HeaderMergeNode
+	JSONNode       httpnode.JSONNode
+	Response       rhttp.Response
+	Request        rhttp.Http
+	ExtractBody    extract.Result
+	ExtractHeaders extract.Result
+	Reflect        httpreflect.Surrounding
 	//Request                 output.Request
 	HttpReflectSurroundings []httpreflect.Surrounding
 }
@@ -24,8 +27,8 @@ func NewStorage(result output.Result) Storage {
 		Payload:    result.Payload,
 		HTMLNode:   httpnode.GetHTMLNode(result.Response.Body),
 		HeaderNode: httpnode.GetHeaderNode(result.Response.Headers),
-		//Extract: ,
-		Response: result.Response,
+		Response:   result.Response,
+
 		//Request:  result.Request,
 		//HttpReflectSurroundings: ,
 	}

@@ -1,8 +1,8 @@
 package knowledge
 
 import (
+	"github.com/Brum3ns/firefly/pkg/extract"
 	"github.com/Brum3ns/firefly/pkg/httpnode"
-	"github.com/Brum3ns/firefly/pkg/httpreflect"
 	"github.com/Brum3ns/firefly/pkg/rhttp"
 )
 
@@ -11,12 +11,12 @@ type Knowledge struct {
 	Merged  map[string]MergedKnowledge
 }
 
-type MergedKnowledge struct {
-	Canary    string
-	Responses []rhttp.Response
-	//Requests                []output.Request
-	HttpReflectSurroundings []httpreflect.Surrounding
-	Merge                   Merge
+type KnowledgeMeta struct {
+	TargetHash          string
+	Payload             string
+	HTTPResponse        rhttp.Response
+	ExtractResultHeader extract.Result
+	ExtractResultBody   extract.Result
 }
 
 func NewKnowledge() Knowledge {
@@ -30,15 +30,20 @@ func (k *Knowledge) SetMergeKnowledge() {
 	k.Merged = GetKnowledge(k.Storage)
 }
 
-func (k *Knowledge) AppendKnowledge(targetHash, payload string, resp rhttp.Response) {
-	k.Storage[targetHash] = append(
-		k.Storage[targetHash],
+func (k *Knowledge) AppendKnowledge(meta KnowledgeMeta) {
+	// Get the JSON node and ignore errors
+	jsonNode, _ := httpnode.GetJSONNode(meta.HTTPResponse.Body)
+
+	k.Storage[meta.TargetHash] = append(
+		k.Storage[meta.TargetHash],
 		Storage{
-			Payload:    payload,
-			HTMLNode:   httpnode.GetHTMLNode(resp.Body),
-			HeaderNode: httpnode.GetHeaderNode(resp.Headers),
-			//Extract: ,
-			Response: resp,
+			Payload:        meta.Payload,
+			HTMLNode:       httpnode.GetHTMLNode(meta.HTTPResponse.Body),
+			HeaderNode:     httpnode.GetHeaderNode(meta.HTTPResponse.Headers),
+			JSONNode:       jsonNode,
+			ExtractBody:    meta.ExtractResultBody,
+			ExtractHeaders: meta.ExtractResultHeader,
+			Response:       meta.HTTPResponse,
 			//Request: result.job.,
 			//HttpReflectSurroundings: ,
 		},
