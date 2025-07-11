@@ -2,16 +2,18 @@ package scan
 
 import (
 	"github.com/Brum3ns/firefly/internal/knowledge"
+	"github.com/Brum3ns/firefly/pkg/extract"
 	"github.com/Brum3ns/firefly/pkg/httpdiff"
-	"github.com/Brum3ns/firefly/pkg/httpnode"
 	"github.com/Brum3ns/firefly/pkg/randomness"
 	"github.com/Brum3ns/firefly/pkg/rhttp"
 )
 
+// Scan represents a scanning operation configuration and behavior.
 type Scan struct {
 	config Config
 }
 
+// Config holds the configuration for a Scan.
 type Config struct {
 	HTTPResponse   rhttp.Response
 	Randomness     randomness.Randomness
@@ -19,46 +21,46 @@ type Config struct {
 	HTTPDiffFilter httpdiff.Filter
 	Payload        string
 	VerifyPayload  string
-}
-type Result struct {
-	HTTPDiff httpdiff.Result
+	Extract        extract.Extract
+	Skip           Skip
 }
 
+// Skip specifies which checks to skip during the scan.
+type Skip struct {
+	SkipBodyDiff      bool
+	SkipHeaderDiff    bool
+	SkipExtractBody   bool
+	SkipExtractHeader bool
+}
+
+// Result holds the outcome of the scanning process.
+type Result struct {
+	OK       bool            `json:"ok"`
+	HTTPDiff httpdiff.Result `json:"httpdiff"`
+	Extract  Extract         `json:"extract"`
+}
+
+// Extract contains the results of the extraction operation.
+type Extract struct {
+	OK     bool           `json:"ok"`
+	Body   extract.Result `json:"body"`
+	Header extract.Result `json:"header"`
+}
+
+// NewScan creates a new Scan instance with the provided configuration.
 func NewScan(config Config) (Scan, error) {
 	return Scan{
 		config: config,
 	}, nil
 }
 
+// Run initiates the scanning process and returns the overall result.
 func (scan *Scan) Run() (Result, error) {
-	resultHttpDiff := scan.Diff()
-
+	resultDiff := scan.Diff()
+	resultExtract := scan.Extract()
 	return Result{
-		HTTPDiff: resultHttpDiff,
+		OK:       resultDiff.OK || resultExtract.OK,
+		HTTPDiff: resultDiff,
+		Extract:  resultExtract,
 	}, nil
-}
-
-func (scan *Scan) Diff() httpdiff.Result {
-	//Make a new difference instant and provided the current HTTP response body and headers:
-	diff := httpdiff.NewDifference(
-		httpdiff.Config{
-			Payload:       scan.config.Payload,
-			PayloadVerify: scan.config.VerifyPayload,
-			Compare: httpdiff.Compare{
-				HTMLMergeNode:   scan.config.Knowledge.Merge.HTMLNode,
-				HeaderMergeNode: scan.config.Knowledge.Merge.HeaderNode,
-			},
-			Randomness: scan.config.Randomness,
-			Filter:     scan.config.HTTPDiffFilter,
-		},
-	)
-
-	headerResult := diff.GetHeadersDiff(httpnode.GetHeaderNode(scan.config.HTTPResponse.Headers))
-	htmlResult := diff.GetHTMLNodeDiff(httpnode.GetHTMLNode(scan.config.HTTPResponse.Body))
-
-	return httpdiff.Result{
-		OK:           (headerResult.OK || htmlResult.OK),
-		HeaderResult: headerResult,
-		HTMLResult:   htmlResult,
-	}
 }
