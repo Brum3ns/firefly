@@ -2,6 +2,7 @@ package payload
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -46,4 +47,15 @@ func (p *Payload) MakeWordlist() error {
 
 func Insert(source, placeholder, payload string) string {
 	return strings.ReplaceAll(source, placeholder, payload)
+}
+
+func ReplaceInOrder(payload string, values []string) (string, error) {
+	for _, i := range values {
+		l := strings.Split(i, " => ")
+		if len(l) != 2 {
+			return payload, fmt.Errorf("could not replace payload, invalid value:[%s]", i)
+		}
+		payload = strings.ReplaceAll(payload, l[0], l[1])
+	}
+	return payload, nil
 }
