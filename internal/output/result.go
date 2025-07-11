@@ -2,8 +2,6 @@ package output
 
 import "github.com/Brum3ns/firefly/pkg/rhttp"
 
-// The output result is the final result that is generated that stores all the result from all processes done by the runner
-// Note : (The final result only stores the result details that are of int `json:""`erest to the user and not the properties that were used during the runner process. The variable may be reformulated for better readability)
 type Result struct {
 	RequestId    int            `json:"RequestId"`
 	TargetHashId string         `json:"TargetId"`
