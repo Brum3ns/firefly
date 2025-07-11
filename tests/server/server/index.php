@@ -29,9 +29,12 @@ if ( isset($_GET['crlf']) ) {
     header("Cache-Control: no-cache, must-revalidate");
 }
 
-function xss() {}
+function syntax() {
+    if ( isset($_GET['syntax']) && str_contains($_GET['syntax'], "'")) {
+        return "syntax error";
+    }
+}
 
-function ssti() {}
 
 function reflect() {
     if ( isset($_GET['reflect']) ) {
@@ -79,14 +82,9 @@ function disappear() {}
 <h3><?= $desc ?></h3>
 
 
-<!-- vulnerabilities -->
-<div class="xss">
-</div>
-
-<div class="ssti">
-</div>
-
-<div class="sqli">
+<!-- behaviors -->
+<div class="syntax">
+    <?= syntax() ?>
 </div>
 
 <div class="crlf">

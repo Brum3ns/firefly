@@ -10,7 +10,7 @@ import (
 	"github.com/Brum3ns/firefly/pkg/httpnode"
 )
 
-func Test_httpprepare_htmlnode(t *testing.T) {
+func Test_httpnode_htmlnode(t *testing.T) {
 	const url = "https://example.com/"
 	resp, err := http.Get(url)
 	if err != nil {

@@ -1,9 +1,10 @@
 version: '3.8'
 services:
     php-apache:
+        image: php:8.2-apache
         container_name: firefly-testserver
-        build:
-            context: .
-            dockerfile: Dockerfile
         ports:
             - 127.0.0.1:1337:80
+        volumes:
+            - ./server:/var/www/html
+        

@@ -1,0 +1,3 @@
+(pasto|error)
+</?html
+[a-b]{4}
