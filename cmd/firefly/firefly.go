@@ -7,6 +7,7 @@ import (
 	"os/signal"
 
 	"github.com/Brum3ns/firefly/internal/option"
+	"github.com/Brum3ns/firefly/internal/output"
 	"github.com/Brum3ns/firefly/internal/runner"
 	"github.com/Brum3ns/firefly/internal/setup"
 	"github.com/Brum3ns/firefly/pkg/design"
@@ -25,13 +26,23 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	if opt.ListPlaceholders {
+	// Check output options
+	if output.FileExist(opt.Output.OutputFile) {
+		if opt.Output.Overwrite {
+			// Remove old output file
+			output.RemoveFile(opt.Output.OutputFile)
+		} else {
+			log.Fatalln("the given output file already exists. To overwrite, use the flag: -oW")
+		}
+	}
+
+	if opt.Placeholder.List {
 		faker.PrintList()
 		return
 	}
 
-	if opt.TestPlaceholders != "" {
-		result, err := faker.Generate(opt.TestPlaceholders)
+	if opt.Placeholder.Test != "" {
+		result, err := faker.Generate(opt.Placeholder.Test)
 		if err != nil {
 			log.Fatalln(err)
 		}
