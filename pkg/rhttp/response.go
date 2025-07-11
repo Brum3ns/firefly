@@ -4,7 +4,6 @@ import (
 	"io"
 	"math"
 	"net/http"
-	"net/http/httputil"
 	"strings"
 	"time"
 )
@@ -27,7 +26,7 @@ type Response struct {
 }
 
 func NewResponse(resp *http.Response, respTime time.Duration) (Response, error) {
-	bodyBytes, err := httputil.DumpResponse(resp, true)
+	bodyBytes, err := ReadResponseBody(resp)
 
 	//bodyBytes, err := MakeResponseBody(resp.Body)
 	if err != nil {
@@ -54,10 +53,12 @@ func NewResponse(resp *http.Response, respTime time.Duration) (Response, error) 
 	}, nil
 }
 
-func MakeResponseBody(body io.Reader) ([]byte, error) {
-	bodyBytes, err := io.ReadAll(body)
+// ReadResponseBody reads all of resp.Body into a byte slice,
+func ReadResponseBody(resp *http.Response) ([]byte, error) {
+	// Read the body in full
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	return bodyBytes, nil
 }

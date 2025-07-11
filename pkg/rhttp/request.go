@@ -21,12 +21,14 @@ type HttpRaw struct {
 }
 
 type Config struct {
-	Methods     []string
-	Headers     map[string][]string
-	Url         string
-	URIPath     string
-	Body        string
-	RespectHSTS bool
+	Version             string
+	Methods             []string
+	Headers             map[string][]string
+	Url                 string
+	URIPath             string
+	Body                string
+	RespectHSTS         bool
+	HeaderPresetBrowser string
 }
 
 func NewRequest(config Config, options *rawhttp.Options) (Http, error) {
@@ -59,12 +61,18 @@ func (req *Http) MakeCoreRequests() error {
 		uripath = u.RequestURI()
 	}
 
+	if req.config.HeaderPresetBrowser != "" && !validHeaderPreset(req.config.HeaderPresetBrowser) {
+		return fmt.Errorf("could not preset headers, invalid value: [%s]", req.config.HeaderPresetBrowser)
+	}
+
 	for _, method := range req.config.Methods {
 		rawRequest, err := DumpRequestRaw(
+			MakeHTTPVersion(req.config.Version),
 			method,
 			req.config.Url,
 			uripath,
 			req.config.Headers,
+			req.config.HeaderPresetBrowser,
 			strings.NewReader(req.config.Body),
 			req.Client.Options,
 		)
