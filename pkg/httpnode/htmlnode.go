@@ -20,7 +20,7 @@ type HTMLNode struct {
 }
 
 // !Note : (MUST be the same name as the "HTMLNode")
-type HTMLNodeCombine struct {
+type HTMLNodeMerge struct {
 	TagStart       map[string][]int `json:"TagStart"`
 	TagEnd         map[string][]int `json:"TagEnd"`
 	TagSelfClose   map[string][]int `json:"TagSelfClose"`
@@ -44,8 +44,8 @@ func NewHTMLNode() HTMLNode {
 	}
 }
 
-func NewCombineHTMLNode() HTMLNodeCombine {
-	return HTMLNodeCombine{
+func NewMergeHTMLNode() HTMLNodeMerge {
+	return HTMLNodeMerge{
 		TagStart:       make(map[string][]int),
 		TagEnd:         make(map[string][]int),
 		TagSelfClose:   make(map[string][]int),

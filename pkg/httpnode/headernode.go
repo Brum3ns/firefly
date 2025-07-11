@@ -6,19 +6,19 @@ import (
 	"slices"
 )
 
-type HeaderNode map[string]HeaderInfo
+type HeaderMergeNode map[string]HeaderInfo
 
 type HeaderInfo struct {
 	Amount []int
 	Values []string
 }
 
-func NewHeader() HeaderNode {
-	return make(HeaderNode)
+func NewHeader() HeaderMergeNode {
+	return make(HeaderMergeNode)
 }
 
 // Take HTTP headers and merge it within the prepared header
-func (header HeaderNode) Merge(httpheader http.Header) HeaderNode {
+func (header HeaderMergeNode) Merge(httpheader http.Header) HeaderMergeNode {
 	for h, values := range httpheader {
 
 		// Note : The amount of values in the list "http.Header"
@@ -54,7 +54,7 @@ func (header HeaderNode) Merge(httpheader http.Header) HeaderNode {
 }
 
 // Take a http.header and return a prepared header node
-func GetHeaderNode(httpheader http.Header) HeaderNode {
+func GetHeaderNode(httpheader http.Header) HeaderMergeNode {
 	header := NewHeader()
 	// Note : We do not need to check for duplicates since http.Header is a map in it's core.
 	// We also do return a fresh new Header type.
@@ -72,7 +72,7 @@ func GetHeaderNode(httpheader http.Header) HeaderNode {
 	return header
 }
 
-func HeaderNodeToJson(htmlnode HeaderNode) ([]byte, error) {
+func HeaderNodeToJson(htmlnode HeaderMergeNode) ([]byte, error) {
 	jsonBytes, err := json.Marshal(htmlnode)
 	if err != nil {
 		return jsonBytes, err
