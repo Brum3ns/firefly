@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 
 	"github.com/dlclark/regexp2"
@@ -125,6 +126,22 @@ func buildPrefixMap(words []string) map[string][]string {
 	for _, w := range words {
 		if !assigned[w] {
 			result[w] = []string{w}
+		}
+	}
+	return result
+}
+
+func UniqueExtracts(result Result, knownExtracts map[string][]int) {
+	result.Regexes = uniqueHits(result.Regexes, knownExtracts)
+	result.Keywords = uniqueHits(result.Keywords, knownExtracts)
+}
+
+func uniqueHits(mapA map[string]int, mapB map[string][]int) map[string]int {
+	result := make(map[string]int)
+
+	for key, value := range mapA {
+		if values, exists := mapB[key]; !exists || !slices.Contains(values, value) {
+			result[key] = value
 		}
 	}
 	return result
