@@ -2,13 +2,16 @@ package option
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/Brum3ns/firefly/pkg/encode"
 	"github.com/projectdiscovery/goflags"
 )
 
 type Option struct {
 	Input       input
+	Scan        Scan
 	Process     process
 	Http        http
 	Match       match
@@ -25,51 +28,51 @@ type Option struct {
 
 var (
 	DEFAULT_FILTER_DIFF_HEADER = []string{
-		"age",
-		"alt-svc",
-		"cache-control",
-		"cf-cache-status",
-		"cf-ray",
-		"content-length",
-		"content-encoding",
-		"date",
-		"etag",
-		"expires",
-		"last-modified",
-		"location",
-		"pragma",
-		"retry-after",
-		"server-timing",
-		"set-cookie",
-		"strict-transport-security",
-		"transfer-encoding",
-		"vary",
-		"via",
-		"x-amz-cf-id",
-		"x-amz-request-id",
-		"x-aspnet-version",
-		"x-cache",
-		"x-cache-status",
-		"x-cloud-trace-context",
-		"x-content-type-options",
-		"x-correlation-id",
-		"x-edge-location",
-		"x-fastly-request-id",
-		"x-frame-options",
-		"x-powered-by",
-		"x-request-id",
-		"x-response-time",
-		"x-runtime",
-		"x-serve-time",
-		"x-server",
-		"x-served-by",
-		"x-timer",
-		"x-trans-id",
-		"x-ua-compatible",
-		"x-varnish",
-		"x-vercel-cache",
-		"x-vercel-id",
-		"x-xss-protection",
+		"Age",
+		"Alt-Svc",
+		"Cache-Control",
+		"CF-Cache-Status",
+		"CF-Ray",
+		"Content-Length",
+		"Content-Encoding",
+		"Date",
+		"ETag",
+		"Expires",
+		"Last-Modified",
+		"Location",
+		"Pragma",
+		"Retry-After",
+		"Server-Timing",
+		"Set-Cookie",
+		"Strict-Transport-Security",
+		"Transfer-Encoding",
+		"Vary",
+		"Via",
+		"X-Amz-Cf-Id",
+		"X-Amz-Request-Id",
+		"X-AspNet-Version",
+		"X-Cache",
+		"X-Cache-Status",
+		"X-Cloud-Trace-Context",
+		"X-Content-Type-Options",
+		"X-Correlation-ID",
+		"X-Edge-Location",
+		"X-Fastly-Request-Id",
+		"X-Frame-Options",
+		"X-Powered-By",
+		"X-Request-ID",
+		"X-Response-Time",
+		"X-Runtime",
+		"X-Serve-Time",
+		"X-Server",
+		"X-Served-By",
+		"X-Timer",
+		"X-Trans-ID",
+		"X-UA-Compatible",
+		"X-Varnish",
+		"X-Vercel-Cache",
+		"X-Vercel-ID",
+		"X-XSS-Protection",
 	}
 )
 
@@ -78,33 +81,40 @@ type input struct {
 	Url            string `errcode:"IN-URL-001"`
 }
 
+type Scan struct {
+	DisableExtract   bool
+	DisableDiff      bool
+	ResponseTimeDiff int // TODO
+}
 type process struct {
 	Silence bool `errcode:"PRO-SILENCE-001"`
 }
 
 type output struct {
-	OutputFile string `errcode:"OUT-FILE-001"`
-	Overwrite  bool   `errcode:"OUT-FILE-002"`
-	LogFile    string `errcode:"OUT-LOG-001"`
+	OutputFile             string `errcode:"OUT-FILE-001"`
+	OutputFileAnalyze      string `errcode:"OUT-FILE-004"`
+	Overwrite              bool   `errcode:"OUT-FILE-002"`
+	OutputHTTPResponseBody bool   `errcode:"OUT-FILE-003"`
+	LogFile                string `errcode:"OUT-LOG-001"`
 }
 
 type http struct {
-	Version                string              `errcode:"HTTP-PROTO-001"`
-	Methods                goflags.StringSlice `errcode:"HTTP-METHOD-001"`
-	Headers                goflags.StringSlice `errcode:"HTTP-HEADER-001"`
-	HeadersBrowserPreset   string              `errcode:"HTTP-HEADER-002"`
-	URIPath                string              `errcode:"HTTP-PATH-001"`
-	Body                   string              `errcode:"HTTP-BODY-001"`
-	Proxy                  string              `errcode:"HTTP-PROXY-001"`
-	Timeout                int                 `errcode:"HTTP-TIMEOUT-001"`
-	Delay                  int
-	FollowRedirect         bool `errcode:"HTTP-REDIRECT-001"`
-	MaxRedirects           int
-	FollowHostRedirects    bool
-	RespectHSTS            bool
-	AutomaticHostHeader    bool
-	AutomaticContentLength bool
-	ProxyDialTimeout       int
+	Version                       string              `errcode:"HTTP-PROTO-001"`
+	Methods                       goflags.StringSlice `errcode:"HTTP-METHOD-001"`
+	Headers                       goflags.StringSlice `errcode:"HTTP-HEADER-001"`
+	HeadersBrowserPreset          string              `errcode:"HTTP-HEADER-002"`
+	URIPath                       string              `errcode:"HTTP-PATH-001"`
+	Body                          string              `errcode:"HTTP-BODY-001"`
+	Proxy                         string              `errcode:"HTTP-PROXY-001"`
+	Timeout                       int                 `errcode:"HTTP-TIMEOUT-001"`
+	Delay                         int
+	FollowRedirect                bool `errcode:"HTTP-REDIRECT-001"`
+	MaxRedirects                  int
+	FollowHostRedirects           bool
+	RespectHSTS                   bool
+	DisableAutomaticHostHeader    bool
+	DisableAutomaticContentLength bool
+	ProxyDialTimeout              int
 }
 
 type match struct {
@@ -148,6 +158,8 @@ type payload struct {
 	ReflectEnd   int                 `errcode:"PAY-REFLECT-002"`
 	Suffix       string              `errcode:"PAY-SUFFIX-001"`
 	Replace      goflags.StringSlice `errcode:"PAY-REPLACE-001"`
+	Encoders     goflags.StringSlice `errcode:"PAY-ENCODE-001"`
+	EncoderParts goflags.StringSlice `errcode:"PAY-ENCODE-002"`
 }
 
 type extract struct {
@@ -184,7 +196,7 @@ func NewOption() (Option, error) {
 	opt := Option{}
 
 	flagSet := goflags.NewFlagSet()
-	flagSet.SetDescription("Firefly is an advanced black-box fuzzer and not just a standard asset discovery tool. Firefly provides the advantage of testing a target with a large number of built-in checks to detect behaviors in the target.")
+	flagSet.SetDescription("Firefly is an advanced black-box fuzzer and not just a standard asset discovery tool. Firefly provides the advantage of testing a target with a large number of built-in checks to detect behaviors in a web application.")
 
 	flagSet.CreateGroup("input", "Input",
 		flagSet.StringVarP(&opt.Input.RawHTTPRequest, "raw", "r", "", "raw HTTP request"),
@@ -206,9 +218,9 @@ func NewOption() (Option, error) {
 		flagSet.IntVarP(&opt.Http.Delay, "delay", "D", 0, "Delay between HTTP requests in milliseconds (ms)"),
 		flagSet.StringVar(&opt.Http.Proxy, "proxy", "", "HTTP Proxy"),
 		flagSet.IntVarP(&opt.Http.ProxyDialTimeout, "proxy-timeout", "pT", 4000, "Proxy timeout in milliseconds (ms)"),
-		flagSet.BoolVar(&opt.Http.AutomaticContentLength, "acl", false, "Add automatic content-length in HTTP request"),
-		flagSet.BoolVar(&opt.Http.AutomaticHostHeader, "ahost", false, "Add automatic host header in HTTP request"),
-		flagSet.BoolVarP(&opt.Http.FollowHostRedirects, "redirect-host", "rFH", false, "Follow host redirect"),
+		flagSet.BoolVarP(&opt.Http.DisableAutomaticContentLength, "disable-auto-contentlength", "dacl", false, "Add automatic content-length in HTTP request"),
+		flagSet.BoolVarP(&opt.Http.DisableAutomaticHostHeader, "disable-auto-host", "dah", false, "Add automatic host header in HTTP request"),
+		//flagSet.BoolVarP(&opt.Http.FollowHostRedirects, "redirect-host", "rFH", false, "Follow host redirect"),
 		flagSet.BoolVarP(&opt.Http.FollowRedirect, "redirect", "rF", false, "Follow redirect"),
 		flagSet.IntVarP(&opt.Http.MaxRedirects, "redirect-max", "rM", 3, "Follow redirect"),
 		flagSet.BoolVar(&opt.Http.RespectHSTS, "hsts", false, "Respect HTTP Strict Transport Security (HSTS)"),
@@ -216,6 +228,13 @@ func NewOption() (Option, error) {
 
 	flagSet.CreateGroup("diff filter", "Diff Filter",
 		flagSet.StringSliceVar(&opt.Filter.FilterDiffHeaders, "fdH", DEFAULT_FILTER_DIFF_HEADER, "Filter hevy dynamic HTTP headers to avoid false positives when performing difference scans", goflags.CommaSeparatedStringSliceOptions),
+	)
+
+	// TODO : Make them work
+	flagSet.CreateGroup("scanner", "Scanner",
+		flagSet.BoolVarP(&opt.Scan.DisableExtract, "disable-extract", "dE", false, "Disable extract using regex/wordlist from the HTTP response"),
+		flagSet.IntVarP(&opt.Scan.ResponseTimeDiff, "time-diff", "dT", 0, "HTTP Response Time difference to be counted as a suspisious behavior (used in timing attacks)"),
+		flagSet.BoolVarP(&opt.Scan.DisableDiff, "disable-diff", "dD", false, "Disable diff checks between knowledge and fuzzed HTTP response results"),
 	)
 
 	flagSet.CreateGroup("http filter", "HTTP Filter",
@@ -255,7 +274,7 @@ func NewOption() (Option, error) {
 	)
 
 	flagSet.CreateGroup("randomness", "Randomness",
-		flagSet.IntVarP(&opt.Randomness.EntropyValue, "eV", "", 3500, "Minimum entropy value to counts as a random value (noise) in the HTTP respons. (Ex: 3500 => 3.5 entropy)"),
+		flagSet.IntVarP(&opt.Randomness.EntropyValue, "eV", "entropy", 3500, "Minimum entropy value to counts as a random value (noise) in the HTTP respons. (Ex: 3500 => 3.5 entropy)"),
 	)
 
 	flagSet.CreateGroup("payload", "Payload",
@@ -267,6 +286,8 @@ func NewOption() (Option, error) {
 		flagSet.IntVar(&opt.Payload.ReflectStart, "rs", 6, "Payload surrounding length start"),
 		flagSet.IntVar(&opt.Payload.ReflectEnd, "re", 6, "Payload surrounding length end"),
 		flagSet.StringSliceVar(&opt.Payload.Replace, "pr", []string{}, "Replace values inside payloads in the given wordlist, separeted by comma", goflags.CommaSeparatedStringSliceOptions),
+		flagSet.StringSliceVarP(&opt.Payload.EncoderParts, "ep", "encode-parts", []string{}, "Parts to be encoded within the payloads", goflags.CommaSeparatedStringSliceOptions),
+		flagSet.StringSliceVarP(&opt.Payload.Encoders, "e", "encode", []string{}, fmt.Sprintf("Encoders to encode each payload with in order, separated with comma.Supported encoders:\n%v\n", strings.Join(encode.GetEncoders(), "\n")), goflags.CommaSeparatedStringSliceOptions),
 	)
 
 	flagSet.CreateGroup("extract", "Extract",
@@ -293,7 +314,9 @@ func NewOption() (Option, error) {
 	flagSet.CreateGroup("output", "Output",
 		flagSet.BoolVarP(&opt.Output.Overwrite, "output-overwrite", "oW", false, "Overwrite output file"),
 		flagSet.StringVarP(&opt.Output.OutputFile, "output", "o", "", "Output file in JSON format"),
+		flagSet.StringVarP(&opt.Output.OutputFileAnalyze, "output-analyze", "oA", "", "Output file for payload analyze in JSON format"),
 		flagSet.StringVar(&opt.Output.LogFile, "log", getLogFile(), "File to store all logs"),
+		flagSet.BoolVarP(&opt.Output.OutputHTTPResponseBody, "output-responsebody", "orb", false, "Save full HTTP response in output"),
 	)
 
 	if err := flagSet.Parse(); err != nil {
