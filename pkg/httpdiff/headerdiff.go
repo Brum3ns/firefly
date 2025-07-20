@@ -15,10 +15,10 @@ type HeaderResult struct {
 
 // Filter HTTP header name
 func (hdiff *HttpDiff) FilterHeader(header string /*value string*/) bool {
-	if len(hdiff.config.Filter.HeaderFilter.Header) == 0 {
+	if len(hdiff.config.Filter.Headers) == 0 {
 		return false
 	}
-	return hdiff.config.Filter.HasHeader(header)
+	return slices.Contains(hdiff.config.Filter.Headers, header)
 }
 
 // Take two prepared header structures and compare their differences
@@ -45,7 +45,7 @@ func (hdiff *HttpDiff) GetHeadersDiff(HeaderNode httpnode.HeaderMergeNode) Heade
 			// Search for unique values inside the current and known header data values
 			if (!lstIntShareItem(knownHeaderData.Amount, currentHeaderData.Amount) ||
 				!lstStringShareItem(knownHeaderData.Values, currentHeaderData.Values)) &&
-				!slices.Contains(knownHeaderData.Values, hdiff.config.Payload) {
+				!slices.Contains(knownHeaderData.Values, hdiff.config.Payload) { // TODO : we want to detect the payload reflected in the headers, no?
 
 				appear[currentHeader] = currentHeaderData
 			}

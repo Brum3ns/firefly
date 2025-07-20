@@ -30,11 +30,6 @@ type Result struct {
 	JSON   JSONResult   `json:"jsonresult"`
 }
 
-type Filter struct {
-	HeaderFilter
-	//HTMLFilter
-}
-
 type diffNode struct {
 	hit             int
 	checkRandomness bool
