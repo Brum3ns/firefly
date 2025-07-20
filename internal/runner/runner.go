@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
+	"github.com/Brum3ns/firefly/internal/analyze"
 	"github.com/Brum3ns/firefly/internal/knowledge"
 	"github.com/Brum3ns/firefly/internal/option"
+	"github.com/Brum3ns/firefly/internal/output"
 	"github.com/panjf2000/ants/v2"
 
 	"github.com/Brum3ns/firefly/pkg/extract"
@@ -28,20 +31,22 @@ const (
 )
 
 type Runner struct {
-	mode        string
-	wg          waitGroup
-	channel     channel
-	payload     payload.Payload
-	extract     extract.Extract
-	request     rhttp.Http
-	option      option.Option
-	httpfilter  httpfilter.Filter
-	httpreflect httpreflect.Reflect
-	httpmatch   httpfilter.Filter
-	randomness  randomness.Randomness
-	statistic   statistics.Statistic
-	workerpool  workerpool
-	knowledge   knowledge.Knowledge
+	mode               string
+	wg                 waitGroup
+	channel            channel
+	payload            payload.Payload
+	extract            extract.Extract
+	request            rhttp.Http
+	option             option.Option
+	httpfilter         httpfilter.Filter
+	httpreflect        httpreflect.Reflect
+	httpmatch          httpfilter.Filter
+	randomness         randomness.Randomness
+	statistic          statistics.Statistic
+	workerpool         workerpool
+	knowledge          knowledge.Knowledge
+	analyzeResult      [][]byte
+	analyzeResultGroup []analyze.ResultGroup
 }
 
 type workerpool struct {
@@ -106,20 +111,21 @@ func NewRunner(opt option.Option) (Runner, error) {
 
 	// Configure HTTP request
 	if r.request, err = rhttp.NewRequest(rhttp.Config{
-		Version:     opt.Http.Version,
-		Methods:     opt.Http.Methods,
-		Headers:     rhttp.MakeHeaders(opt.Http.Headers),
-		Url:         opt.Input.Url,
-		URIPath:     opt.Http.URIPath,
-		Body:        opt.Http.Body,
-		RespectHSTS: opt.Http.RespectHSTS,
+		Version:             opt.Http.Version,
+		Methods:             opt.Http.Methods,
+		Headers:             rhttp.MakeHeaders(opt.Http.Headers),
+		Url:                 opt.Input.Url,
+		URIPath:             opt.Http.URIPath,
+		Body:                opt.Http.Body,
+		RespectHSTS:         opt.Http.RespectHSTS,
+		HeaderPresetBrowser: opt.Http.HeadersBrowserPreset,
 	},
 		&rawhttp.Options{
 			Timeout:                time.Duration(opt.Http.Timeout) * time.Millisecond,
 			FollowRedirects:        opt.Http.FollowRedirect,
 			MaxRedirects:           3,
-			AutomaticHostHeader:    opt.Http.AutomaticHostHeader,
-			AutomaticContentLength: opt.Http.AutomaticContentLength,
+			AutomaticHostHeader:    !opt.Http.DisableAutomaticHostHeader,
+			AutomaticContentLength: !opt.Http.DisableAutomaticContentLength,
 			Proxy:                  opt.Http.Proxy,
 			ProxyDialTimeout:       time.Duration(opt.Http.ProxyDialTimeout) * time.Millisecond,
 			CustomRawBytes:         []byte(opt.Input.RawHTTPRequest),
@@ -229,6 +235,19 @@ func (r *Runner) RunFuzz() (statistics.Statistic, error) {
 	if err := r.run(); err != nil {
 		return r.statistic, err
 	}
+
+	if r.option.Output.OutputFileAnalyze != "" {
+		if err := r.makeAnalyzeResultGroup(); err != nil {
+			log.Fatalln(err)
+		}
+		if err := output.OutputJsonToFile(
+			r.analyzeResultGroup,
+			r.option.Output.OutputFileAnalyze,
+		); err != nil {
+			log.Fatalln(err)
+		}
+	}
+
 	return r.statistic, nil
 }
 
@@ -296,4 +315,18 @@ func (r *Runner) setMode(mode string) {
 // Get mode knowledge / fuzz
 func (r *Runner) getMode() string {
 	return r.mode
+}
+
+// Append analyze result
+func (r *Runner) appendAnalyzeResult(jsonData []byte) {
+	r.analyzeResult = append(r.analyzeResult, jsonData)
+}
+
+func (r *Runner) makeAnalyzeResultGroup() error {
+	analyzeResultGroup, err := analyze.GroupByScan(r.analyzeResult)
+	if err != nil {
+		return err
+	}
+	r.analyzeResultGroup = analyzeResultGroup
+	return nil
 }

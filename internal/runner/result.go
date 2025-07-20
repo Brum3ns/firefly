@@ -17,33 +17,40 @@ func (r *Runner) handlerResult(ctx context.Context) {
 			// Analyze result - Check if the scanner got a hit/miss in the result
 			if scannerResult.scanResult.OK {
 				// Make the final output result to be saved to output file
-				outputJson, err := output.MakeOutputJSON(output.Output{
-					Date: getTime(),
-					Input: output.Input{
-						Payload: scannerResult.coreJob.payload,
-					},
-					Scan: output.Scan{
-						Httpdiff: scannerResult.scanResult.HTTPDiff,
-						Extract: extract.Result{
-							Regexes:  scannerResult.scanResult.Extract.Body.Regexes,
-							Keywords: scannerResult.scanResult.Extract.Body.Keywords,
+				outputJson, err := output.MakeOutputFileJSON(
+					output.Output{
+						Date: getTime(),
+						Input: output.Input{
+							Payload: scannerResult.coreJob.payload,
+						},
+						Scan: output.Scan{
+							Httpdiff: scannerResult.scanResult.HTTPDiff,
+							Extract: extract.Result{
+								Regexes:  scannerResult.scanResult.Extract.Body.Regexes,
+								Keywords: scannerResult.scanResult.Extract.Body.Keywords,
+							},
+						},
+						Http: output.Http{
+							Response:   scannerResult.coreJob.httpResponse,
+							RawRequest: string(scannerResult.coreJob.httpRawRequest.TemplateRawRequest),
 						},
 					},
-					Http: output.Http{
-						Response:   scannerResult.coreJob.httpResponse,
-						RawRequest: string(scannerResult.coreJob.httpRawRequest.TemplateRawRequest),
-					},
-				})
+					r.option.Output.OutputHTTPResponseBody,
+				)
 				if err != nil {
 					log.Println(err)
 				}
 
 				// Make output to file
 				if r.option.Output.OutputFile != "" {
-					err := output.AppendOutputToFile(outputJson, r.option.Output.OutputFile)
+					err := output.AppendOutputJsonToFile(outputJson, r.option.Output.OutputFile)
 					if err != nil {
 						log.Fatalln(err)
 					}
+				}
+				// Check analyze output
+				if r.option.Output.OutputFileAnalyze != "" {
+					r.appendAnalyzeResult(outputJson)
 				}
 			}
 

@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/Brum3ns/firefly/pkg/encode"
 	"github.com/Brum3ns/firefly/pkg/faker"
 	"github.com/Brum3ns/firefly/pkg/httpfilter"
 	"github.com/Brum3ns/firefly/pkg/payload"
@@ -30,10 +31,18 @@ func (r *Runner) handlerJobRequest(ctx context.Context) {
 				}
 
 				// Payload data insert
+				pyld, err := encode.Encode(
+					job.payload,
+					r.option.Payload.EncoderParts,
+					r.option.Payload.Encoders,
+				)
+				if err != nil {
+					log.Printf("could not encode payload, error %v:", err)
+				}
 				rawRequest := payload.Insert(
 					rawHttpRequest,
 					r.option.Payload.Placeholder,
-					job.payload,
+					pyld,
 				)
 
 				timer := time.Now()

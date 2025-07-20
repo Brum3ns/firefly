@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/Brum3ns/firefly/internal/scan"
+	"github.com/Brum3ns/firefly/pkg/httpdiff"
 )
 
 func (r *Runner) handleJobScanner(ctx context.Context) {
@@ -36,7 +37,9 @@ func (r *Runner) handleJobScanner(ctx context.Context) {
 					SkipExtractBody:   r.option.Skip.ExtractBody,
 					SkipExtractHeader: r.option.Skip.ExtractHeader,
 				},
-				//HTTPDiffFilter: httpdiff.Filter{}, // TODO
+				HTTPDiffFilter: httpdiff.Filter{
+					Headers: r.option.Filter.FilterDiffHeaders,
+				}, // TODO
 				Knowledge: r.knowledge.Merged[targetHash],
 			})
 			if err != nil {
