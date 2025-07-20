@@ -17,62 +17,80 @@ import (
 type Encoder func(string) (string, error)
 
 var encodeFuncs = map[string]Encoder{
-	"surl":    SingleUrlEncode,
-	"sdurl":   DoubleUrlEncode,
-	"url":     UrlEscape,
-	"durl":    UrlDoubleEscape,
-	"html":    HTMLEscape,
-	"htmle":   HTMLEquivalent,
-	"base64":  Base64,
-	"base32":  Base32,
-	"hex":     Hex,
-	"json":    JSONEncode,
-	"binary":  BinaryEncode,
-	"gzipb64": GzipBase64,
-	"unicode": UnicodeEscape,
+	"url":       SingleUrlEncode,
+	"urlfull":   UrlEscape,
+	"urldouble": DoubleUrlEncode,
+	"html":      HTMLEscape,
+	"htmlhex":   HTMLHex,
+	"base64":    Base64,
+	"base32":    Base32,
+	"hex":       Hex,
+	"json":      JSONEncode,
+	"binary":    BinaryEncode,
+	"gzip":      Gzip,
+	"unicode":   UnicodeEscape,
 }
 
 // Encode applies the selected encodings in order.
 // Supports format: "xor:<key>" and others.
-func Encode(payload string, encodings []string) (string, error) {
+func Encode(payload string, parts []string, encodings []string) (string, error) {
+	if len(encodings) == 0 {
+		return payload, nil
+	}
+
 	var err error
 	for _, enc := range encodings {
-		if strings.HasPrefix(enc, "xor:") {
-			key := strings.TrimPrefix(enc, "xor:")
-			payload, err = XOREncode(payload, key)
-			if err != nil {
-				return "", fmt.Errorf("xor error: %w", err)
-			}
-			continue
-		}
 		encFunc, ok := encodeFuncs[strings.ToLower(enc)]
 		if !ok {
 			return "", fmt.Errorf("unsupported encoding: %s", enc)
 		}
-		payload, err = encFunc(payload)
-		if err != nil {
-			return "", fmt.Errorf("error in %s encoding: %w", enc, err)
+
+		if len(parts) > 0 {
+			for _, part := range parts {
+				rawPart := part
+				part, err = encFunc(part)
+				if err != nil {
+					return "", fmt.Errorf("error in %s encoding: %w", enc, err)
+				}
+				payload = strings.ReplaceAll(payload, rawPart, part)
+			}
+		} else {
+			payload, err = encFunc(payload)
+			if err != nil {
+				return "", fmt.Errorf("error in %s encoding: %w", enc, err)
+			}
 		}
 	}
 	return payload, nil
 }
 
+func GetEncoders() []string {
+	var encoders []string
+	for e := range encodeFuncs {
+		encoders = append(encoders, e)
+	}
+	return encoders
+}
+
 // --- Encoding Implementations ---
-
 func SingleUrlEncode(s string) (string, error) {
-	return "%" + hex.EncodeToString([]byte(s)), nil
-}
-
-func DoubleUrlEncode(s string) (string, error) {
-	encoded := "%" + hex.EncodeToString([]byte(s))
-	return strings.ReplaceAll(encoded, "%", "%25"), nil
-}
-
-func UrlEscape(s string) (string, error) {
 	return url.QueryEscape(s), nil
 }
 
-func UrlDoubleEscape(s string) (string, error) {
+/* func DoubleUrlEncode(s string) (string, error) {
+	encoded := url.QueryEscape(s)
+	return url.QueryEscape(encoded), nil
+} */
+
+func UrlEscape(s string) (string, error) {
+	var encoded strings.Builder
+	for _, r := range s {
+		encoded.WriteString(fmt.Sprintf("%%%02X", r))
+	}
+	return encoded.String(), nil
+}
+
+func DoubleUrlEncode(s string) (string, error) {
 	escaped := url.QueryEscape(s)
 	return strings.ReplaceAll(escaped, "%", "%25"), nil
 }
@@ -81,11 +99,12 @@ func HTMLEscape(s string) (string, error) {
 	return html.EscapeString(s), nil
 }
 
-func HTMLEquivalent(s string) (string, error) {
-	escaped := html.EscapeString(s)
-	escaped = strings.ReplaceAll(escaped, "&#34;", "&quot;")
-	escaped = strings.ReplaceAll(escaped, "&#39;", "&apos;")
-	return escaped, nil
+func HTMLHex(s string) (string, error) {
+	var out strings.Builder
+	for _, r := range s {
+		out.WriteString(fmt.Sprintf("&#x%X;", r))
+	}
+	return out.String(), nil
 }
 
 func Base32(s string) (string, error) {
@@ -116,7 +135,7 @@ func BinaryEncode(s string) (string, error) {
 	return b.String(), nil
 }
 
-func GzipBase64(s string) (string, error) {
+func Gzip(s string) (string, error) {
 	var buf bytes.Buffer
 	gw := gzip.NewWriter(&buf)
 	_, err := gw.Write([]byte(s))
@@ -124,7 +143,7 @@ func GzipBase64(s string) (string, error) {
 		return "", err
 	}
 	gw.Close()
-	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+	return string(buf.Bytes()), nil
 }
 
 func UnicodeEscape(s string) (string, error) {
