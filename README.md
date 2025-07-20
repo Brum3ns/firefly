@@ -1,6 +1,6 @@
 
 <h1 align="center">
-  <img src="assets/fireflyLogo.png" alt="firefly" width="220px">
+  <img src="assets/logo/fireflyLogo.png" alt="firefly" width="220px">
   <br>
 </h1>
  
@@ -22,12 +22,6 @@ Firefly is an advanced black-box fuzzer and not just a standard asset discovery 
 - [x] Friendly error and debug output
 - [x] Build in payloads (default list are mixed with the wordlist from [seclists](https://github.com/danielmiessler/SecLists))
 - [x] Payload tampering and encoding functionality
-
-# Features
-<h1 align="center">
-  <img src="assets/fireflyOptions.png" alt="fireflyOptions" width="100%">
-  <br>
-</h1>
 
 # Installation
 
