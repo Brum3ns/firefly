@@ -31,11 +31,19 @@ type Http struct {
 	Response   rhttp.Response `json:"response"`
 }
 
-func MakeOutputJSON(output Output) ([]byte, error) {
+func MakeOutputFileJSON(output Output, includeResponseBody bool) ([]byte, error) {
+	if !includeResponseBody {
+		output.Http.Response.Body = ""
+	}
 	return json.Marshal(output)
 }
 
-func AppendOutputToFile(outputJson []byte, filename string) error {
+func OutputJsonToFile(data any, filename string) error {
+	out, _ := json.Marshal(data)
+	return AppendOutputJsonToFile(out, filename)
+}
+
+func AppendOutputJsonToFile(outputJson []byte, filename string) error {
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
